@@ -1,0 +1,10 @@
+files/
+node_modules/
+uploads/
+venv/
+.env
+*.db
+*.txt
+*.docx
+*.md
+*.htl

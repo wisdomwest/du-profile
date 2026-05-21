@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daystar University Research Profile & Faculty System</title>
+  
+  <!-- External Polished Typography & Styling Packages -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  
+  <!-- Core Charting and Data Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+</head>
+<body>
+
+  <!-- TOPBAR HEADER -->
+  <header class="topbar" id="app-header">
+    <div class="tb-left">
+      <h1 class="tb-title">Daystar University — DU-Space Research Profile</h1>
+      <div class="tb-sub" id="tb-subtitle">
+        DRICE &bull; Public Research Identity Page &bull; 
+        <span id="db-status">Loading database records...</span>
+      </div>
+    </div>
+    <div class="tb-right">
+      <!-- Quick Filter System -->
+      <select id="yr-filter" onchange="applyFilters()" aria-label="Filter publications by academic year">
+        <option value="all">All years</option>
+        <option value="2026">2026</option>
+        <option value="2025">2025</option>
+        <option value="2024">2024</option>
+        <option value="2023">2023</option>
+        <option value="2022">2022</option>
+        <option value="2021">2021</option>
+        <option value="2020">2020</option>
+      </select>
+      
+      <select id="sc-filter" onchange="applyFilters()" aria-label="Filter publications by school">
+        <option value="all">All schools</option>
+        <option value="SSEH">SSEH</option>
+        <option value="SOC">SOC</option>
+        <option value="SBE">SBE</option>
+        <option value="SHSS">SHSS</option>
+        <option value="SON">SON</option>
+        <option value="SOL">SOL</option>
+        <option value="SASS">SASS</option>
+        <option value="SMT">SMT</option>
+      </select>
+      
+      <!-- Harvesting Select Menu -->
+      <select id="harvest-community-select" aria-label="Select community to harvest">
+        <option value="all">All Communities (OAI-PMH)</option>
+      </select>
+      
+      <button class="btn-import btn-primary-theme" id="harvest-btn" onclick="harvestDUSpace()">
+        &dArr; Live Harvest
+      </button>
+      <button class="btn-import btn-secondary-theme" id="export-csv-btn" onclick="exportCSV()">
+        &uArr; Export CSV
+      </button>
+      <button class="btn-import btn-accent-theme" id="open-upload-modal-btn" onclick="openModal()">
+        Upload CSV
+      </button>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section class="hero" id="app-hero">
+    <div class="hero-eye">Daystar University &bull; Nairobi &amp; Athi River, Kenya</div>
+    <h2 class="hero-title">Research for Faith, Africa &amp; Impact</h2>
+    <p class="hero-sub">
+      Daystar University's research spans AI, community health, media, law, business, theology, and 
+      development — all anchored in a faith-integrated knowledge tradition.
+    </p>
+    
+    <!-- Aggregate Numbers Grid -->
+    <div class="stats-row" id="stats-counter-grid">
+      <div class="stat" id="stat-card-total">
+        <div class="stat-v" id="st-total">&mdash;</div>
+        <div class="stat-l">Total Publications</div>
+      </div>
+      <div class="stat" id="stat-card-schools">
+        <div class="stat-v" id="st-schools">8</div>
+        <div class="stat-l">Schools</div>
+      </div>
+      <div class="stat" id="stat-card-years">
+        <div class="stat-v" id="st-years">&mdash;</div>
+        <div class="stat-l">Years Active</div>
+      </div>
+      <div class="stat" id="stat-card-sdgs">
+        <div class="stat-v" id="st-sdg">&mdash;</div>
+        <div class="stat-l">SDGs Covered</div>
+      </div>
+      <div class="stat" id="stat-card-journals">
+        <div class="stat-v" id="st-journal">&mdash;</div>
+        <div class="stat-l">Journal Articles</div>
+      </div>
+      <div class="stat" id="stat-card-indexed">
+        <div class="stat-v" id="st-indexed">&mdash;</div>
+        <div class="stat-l">Indexed Tiers</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NAVIGATION TABS -->
+  <nav class="main-nav" id="navigation-tabs" aria-label="Main sections navigation">
+    <button class="mnb active" id="tab-charts" onclick="goTo('sec-charts', this)">Charts</button>
+    <button class="mnb" id="tab-pubs" onclick="goTo('sec-pubs', this)">Browse All</button>
+    <button class="mnb" id="tab-recent" onclick="goTo('sec-recent', this)">Recent Outputs</button>
+    <button class="mnb" id="tab-sdg" onclick="goTo('sec-sdg', this)">SDGs Mapping</button>
+    <button class="mnb" id="tab-schools" onclick="goTo('sec-schools', this)">School Profiles</button>
+    <button class="mnb" id="tab-faculty" onclick="goTo('sec-faculty', this)">Faculty Cards</button>
+    <button class="mnb" id="tab-stats" onclick="goTo('sec-stats', this)">Logs &amp; Settings</button>
+  </nav>
+
+  <!-- CONTENT VIEWPORTS -->
+  <main class="content" id="app-main-viewport">
+
+    <!-- CHARTS SECTION -->
+    <section class="sec-block" id="sec-charts">
+      <h3 class="sec-title">Overview Charts</h3>
+      <p class="sec-sub">Publications by school and year trends &mdash; updates dynamically from repository data.</p>
+      
+      <div class="two-col">
+        <!-- School Publications Distribution Chart -->
+        <article class="card" id="school-publications-chart-card">
+          <div class="ctrl-row">
+            <label for="chart-yr">Filter Year:</label>
+            <select id="chart-yr" onchange="updateSchoolChart()">
+              <option value="all">All years</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="2023">2023</option>
+              <option value="2022">2022</option>
+              <option value="2020">2020</option>
+            </select>
+            
+            <label for="chart-tp">Filter Type:</label>
+            <select id="chart-tp" onchange="updateSchoolChart()">
+              <option value="all">All types</option>
+              <option value="Journal Article">Journal articles</option>
+              <option value="Conference Paper">Conference papers</option>
+              <option value="Book Chapter">Book chapters</option>
+            </select>
+          </div>
+          <h4 style="font-size:13px; font-weight:600; color:var(--neutral-dark); margin-bottom:12px">Publications by School</h4>
+          <div style="position:relative; height:220px">
+            <canvas id="schoolChart" role="img" aria-label="Horizontal bar chart showing publications count per school"></canvas>
+          </div>
+        </article>
+
+        <!-- Yearly Trend Stacked Chart -->
+        <article class="card" id="yearly-trend-chart-card">
+          <div class="legend">
+            <span class="lgi"><span class="lgsq" style="background:#25AAE1"></span>Journal articles</span>
+            <span class="lgi"><span class="lgsq" style="background:#7C3AED"></span>Conference papers</span>
+            <span class="lgi"><span class="lgsq" style="background:#E0606F"></span>Book chapters</span>
+          </div>
+          <h4 style="font-size:13px; font-weight:600; color:var(--neutral-dark); margin-bottom:12px">Publication Trend (Recent Years)</h4>
+          <div style="position:relative; height:220px">
+            <canvas id="trendChart" role="img" aria-label="Stacked bar chart illustrating publication trends over recent years"></canvas>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- BROWSE ALL PUBLICATIONS SECTION -->
+    <section class="sec-block" id="sec-pubs">
+      <h3 class="sec-title">Browse All Publications</h3>
+      <p class="sec-sub">Searchable database indices of all harvested and imported research records.</p>
+      
+      <div class="card" id="publications-table-card">
+        <table id="pubTable" class="display" style="width:100%">
+          <thead>
+            <tr>
+              <th style="width:34%">Title &amp; Authors</th>
+              <th style="width:6%">Year</th>
+              <th style="width:8%">School</th>
+              <th style="width:10%">Type</th>
+              <th style="width:14%">Publisher / Venue</th>
+              <th style="width:12%">SDGs</th>
+              <th style="width:8%">Indexing</th>
+              <th style="width:8%">Link</th>
+            </tr>
+          </thead>
+          <tbody id="pub-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- RECENT PUBLICATIONS TIMELINE FEED -->
+    <section class="sec-block" id="sec-recent">
+      <h3 class="sec-title">Recent Publications</h3>
+      <p class="sec-sub">Latest research works added to the repository including abstract snippets.</p>
+      
+      <div class="card" id="recent-feed-timeline-card">
+        <div id="recent-feed"></div>
+      </div>
+    </section>
+
+    <!-- SDG MAP SECTION -->
+    <section class="sec-block" id="sec-sdg">
+      <h3 class="sec-title">SDG Contribution Map</h3>
+      <p class="sec-sub">UN Sustainable Development Goals mapped automatically from publications metadata.</p>
+      
+      <div class="card" id="sdg-contribution-matrix-card">
+        <div class="sdg-grid" id="sdg-grid"></div>
+        <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px">
+          <div style="display:flex; gap:16px; font-size:11px; font-weight:500; color:var(--text-muted)">
+            <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--primary); margin-right:4px; vertical-align:middle"></span>Active Contribution</span>
+            <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--bg-card-alt); border:1px solid var(--border-color); margin-right:4px; vertical-align:middle"></span>Research Opportunity</span>
+          </div>
+          <button class="btn-import btn-primary-theme" id="reanalyze-sdg-btn" onclick="reanalyzeSDGs()">
+            Upgrade to AI SDG Mapping
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI RESEARCH ASSISTANT SECTION -->
+    <section class="sec-block ai-card card" id="sec-ai">
+      <h3 class="sec-title" style="color:var(--neutral-dark)">🤖 AI Research Assistant</h3>
+      <p class="sec-sub" style="color:var(--text-muted)">NVIDIA NIM and Gemini powered intelligent analysis across your university publications.</p>
+      
+      <div class="ai-input-group">
+        <input type="text" id="ai-custom-prompt" placeholder="Ask anything about research clusters, target journals, or grant fits..." />
+        <button class="btn-import btn-primary-theme" id="ai-analyze-btn" onclick="askAICustom()">Analyze &rarr;</button>
+      </div>
+      
+      <div class="ai-quick-tags">
+        <button class="btn-import btn-secondary-theme" onclick="askAIDynamic('grant')" style="color:var(--neutral-dark); border-color:var(--border-color)">
+          Grant Matches
+        </button>
+        <button class="btn-import btn-secondary-theme" onclick="askAIDynamic('idrc')" style="color:var(--neutral-dark); border-color:var(--border-color)">
+          IDRC Suitability
+        </button>
+        <button class="btn-import btn-secondary-theme" onclick="askAIDynamic('journal')" style="color:var(--neutral-dark); border-color:var(--border-color)">
+          Q1 target Journals
+        </button>
+      </div>
+    </section>
+
+    <!-- SCHOOL PROFILE TILES -->
+    <section class="sec-block" id="sec-schools">
+      <h3 class="sec-title">School Research Profiles</h3>
+      <p class="sec-sub">Individual publications profiles, primary research tags, and comparative output indicators.</p>
+      
+      <div class="school-grid" id="school-grid"></div>
+    </section>
+
+    <!-- FACULTY MEMBER CARDS -->
+    <section class="sec-block" id="sec-faculty">
+      <h3 class="sec-title">Faculty Profile Cards</h3>
+      <p class="sec-sub">Automatically constructed faculty publications summary cards based on repository outputs.</p>
+      
+      <div id="faculty-cards"></div>
+    </section>
+
+    <!-- DETAILED AUDIT AND LOGS SECTION -->
+    <section class="sec-block" id="sec-stats">
+      <h3 class="sec-title">Logs &amp; Settings</h3>
+      <p class="sec-sub">System maintenance audits, DSpace harvesting logs, and direct database optimization commands.</p>
+      
+      <div class="two-col">
+        <!-- System Logs -->
+        <article class="card" id="harvest-logs-card">
+          <h4 style="font-family:'Outfit'; font-size:14px; font-weight:700; margin-bottom:12px; color:var(--neutral-dark)">Recent Harvest Events</h4>
+          <div id="harvest-log-rows">
+            <!-- Dynamically populated via backend -->
+          </div>
+        </article>
+
+        <!-- Direct Actions -->
+        <article class="card" id="db-settings-card">
+          <h4 style="font-family:'Outfit'; font-size:14px; font-weight:700; margin-bottom:12px; color:var(--neutral-dark)">Database Maintenance</h4>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px">
+            Perform administrative tasks, database maintenance, or reset the prototype environment fields.
+          </p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap">
+            <button class="btn-import btn-accent-theme" id="clear-database-btn" onclick="clearDatabase()">
+              Clear Database
+            </button>
+            <button class="btn-import btn-secondary-theme" id="reseed-btn" onclick="fetchDataAndRebuild()" style="color:var(--neutral-dark); border-color:var(--border-color)">
+              Refresh View
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- UPLOAD CSV DIALOG MODAL -->
+  <dialog class="modal-bg" id="import-modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <header class="modal-hdr">
+        <h3 class="modal-hdr-title">Upload Publication CSV</h3>
+        <button class="modal-close" onclick="closeModal()">Close</button>
+      </header>
+      <div class="modal-body">
+        <div class="note">
+          Selecting a CSV will completely overwrite the existing publications dataset with new records. Ensure headers map appropriately.
+        </div>
+        <input type="file" id="csv-file-input" accept=".csv" style="margin-bottom: 20px; font-family: inherit; font-size: 13px;" />
+        <div style="display:flex; justify-content:flex-end; gap:10px">
+          <button class="btn-import btn-secondary-theme" onclick="closeModal()" style="color:var(--neutral-dark); border-color:var(--border-color)">Cancel</button>
+          <button class="btn-import btn-primary-theme" id="upload-btn" onclick="importCSV()">Upload &amp; Refresh</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- FOOTER -->
+  <footer class="footer" id="app-footer">
+    <div class="footer-title">Daystar University Research Repository Profile</div>
+    <div class="footer-sub">Data harvested from repository.daystar.ac.ke &bull; Maintained by DRICE &bull; May 2026</div>
+    <div class="footer-links">
+      <a href="https://repository.daystar.ac.ke" target="_blank">DU-Space Repository</a>
+      <a href="https://drice.daystar.ac.ke" target="_blank">DRICE Platform</a>
+      <a href="https://daystar.ac.ke" target="_blank">Daystar University Website</a>
+    </div>
+  </footer>
+
+  <!-- Decoupled Client Logic -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
