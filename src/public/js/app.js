@@ -432,29 +432,6 @@ function updateStats(logData = []) {
       : 'No database records found &bull; import publications above';
   }
 
-  // Populate harvest logs inside Logs section
-  const logsContainer = document.getElementById('harvest-log-rows');
-  if (logsContainer) {
-    logsContainer.innerHTML = '';
-    if (!logData.length) {
-      logsContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:10px">No recent harvesting records in logs.</div>';
-      return;
-    }
-    logData.slice(0, 8).forEach(l => {
-      const row = document.createElement('div');
-      row.className = 'krow';
-      row.innerHTML = `
-        <div class="kl">
-          <strong>${l.source.toUpperCase()}</strong> &mdash; ${l.community}
-          <div style="font-size:10px; color:var(--text-light); margin-top:2px">${l.ts}</div>
-        </div>
-        <div class="kv">
-          <span class="badge bgo">${l.count} records</span>
-        </div>
-      `;
-      logsContainer.appendChild(row);
-    });
-  }
 }
 
 /* ==========================================================================
@@ -558,17 +535,6 @@ function exportCSV() {
   window.location.href = '/api/export-csv';
 }
 
-function clearDatabase() {
-  if (!confirm('DANGER: This action deletes all SQLite publications records. Proceed?')) return;
-  
-  fetch('/api/publications', { method: 'DELETE' })
-    .then(r => r.json())
-    .then(data => {
-      alert(data.message || 'SQLite publications cleared.');
-      fetchDataAndRebuild();
-    })
-    .catch(err => alert('Clear database failed: ' + err.message));
-}
 
 /**
  * Triggers DSpace community live harvests.
@@ -753,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Scroll Event sync to highlight tabs
 window.addEventListener('scroll', () => {
-  const sections = ['sec-charts', 'sec-pubs', 'sec-recent', 'sec-sdg', 'sec-schools', 'sec-faculty', 'sec-stats'];
+  const sections = ['sec-charts', 'sec-pubs', 'sec-recent', 'sec-sdg', 'sec-schools', 'sec-faculty'];
   const tabs = document.querySelectorAll('.mnb');
   
   sections.forEach((id, idx) => {

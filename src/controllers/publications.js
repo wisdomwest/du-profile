@@ -106,12 +106,11 @@ async function getPublications(req, res) {
 async function getStats(req, res) {
   try {
     // Run concurrent queries efficiently using the warm connection pool
-    const [total, byType, bySchool, years, log] = await Promise.all([
+    const [total, byType, bySchool, years] = await Promise.all([
       dbAll('SELECT COUNT(*) n FROM publications'),
       dbAll('SELECT type, COUNT(*) n FROM publications GROUP BY type'),
       dbAll('SELECT school, COUNT(*) n FROM publications GROUP BY school ORDER BY n DESC'),
       dbAll('SELECT MIN(year) mn, MAX(year) mx FROM publications'),
-      dbAll('SELECT * FROM harvest_log ORDER BY ts DESC LIMIT 10'),
     ]);
 
     res.json({
@@ -119,7 +118,7 @@ async function getStats(req, res) {
       byType,
       bySchool,
       years: years[0],
-      log
+      log: []
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -221,17 +220,7 @@ async function harvest(req, res) {
   }
 }
 
-/**
- * DELETE /api/publications
- */
-async function clearDatabase(req, res) {
-  try {
-    await dbRun('DELETE FROM publications');
-    res.json({ message: 'Database publications cleared successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
+
 
 /**
  * POST /api/ai-insight
@@ -267,7 +256,6 @@ module.exports = {
   exportCSV,
   uploadCSV,
   harvest,
-  clearDatabase,
   aiInsight,
   reanalyzeSDGs
 };

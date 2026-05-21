@@ -6,6 +6,48 @@ const OAI_URL = 'https://repository.daystar.ac.ke/oai/request';
 const BASE_REST = 'https://repository.daystar.ac.ke/server/api';
 
 /**
+ * Helper to identify if a record represents an academic course, syllabus, outline, or exam paper.
+ */
+function isCourseRecord(r) {
+  if (!r) return false;
+  const title = (r.title || '').trim();
+  const authors = (r.authors || '').trim();
+
+  // 1. Matches course codes: 3-4 letters followed by optional spaces, then a digit (or O/o as fallback) and 2 digits (plus optional letters)
+  // e.g. PEA 141A/T, ACS 213, CHD 651X, ICM O56T
+  const courseCodeRegex = /^[A-Z]{3,4}\s*[0-9O]\d{2}/i;
+  if (courseCodeRegex.test(title)) {
+    return true;
+  }
+
+  // 2. Authors matches 'Daystar University' exactly (case-insensitive)
+  if (authors.toLowerCase() === 'daystar university') {
+    return true;
+  }
+
+  // 3. Authors contains 'Department of' and 'School of' in capitalized/any case (e.g. from department course outlines)
+  const authorsUpper = authors.toUpperCase();
+  if (authorsUpper.includes('DEPARTMENT OF') && authorsUpper.includes('SCHOOL OF')) {
+    return true;
+  }
+
+  // 4. Matches standard course outline / syllabus / marking scheme titles
+  const titleLower = title.toLowerCase();
+  if (
+    titleLower.includes('course outline') ||
+    titleLower.includes('marking scheme') ||
+    titleLower.includes('course syllabus') ||
+    titleLower.includes('question paper') ||
+    titleLower.includes('exam paper') ||
+    titleLower.includes('examination paper')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Normalizes individual row fields for standard DB insertions.
  * Compatible with CSV imports (string keys) and live harvest feeds.
  */
@@ -63,6 +105,9 @@ async function insertPublications(rows, source, community, schoolCode = null) {
         let count = 0;
         for (const row of rows) {
           const r = normaliseRow(row);
+          if (isCourseRecord(r)) {
+            continue;
+          }
           stmt.run(r.title, r.authors, r.year, r.school, r.type, r.publisher, r.sdgs, r.indexing, r.url, r.abstract);
           count++;
         }
@@ -77,11 +122,6 @@ async function insertPublications(rows, source, community, schoolCode = null) {
           try {
             await dbRun('COMMIT;');
             console.log(`[DB] Transaction committed successfully: ${count} records inserted`);
-
-            // Add an audit log entry
-            await dbRun('INSERT INTO harvest_log (source,community,count,status) VALUES (?,?,?,?)', [
-              source, community, count, 'success'
-            ]);
 
             resolve(count);
           } catch (commitErr) {
@@ -120,7 +160,7 @@ async function harvestREST(communityId, schoolCode) {
       for (const obj of objects) {
         const meta = obj?._embedded?.indexableObject?.metadata || {};
         const mv = k => (meta[k] || []).map(v => v.value).join(' | ');
-        records.push({
+        const rec = {
           title: mv('dc.title'),
           authors: mv('dc.contributor.author'),
           year: mv('dc.date.issued').substring(0, 4),
@@ -130,7 +170,9 @@ async function harvestREST(communityId, schoolCode) {
           subject: mv('dc.subject'),
           abstract: mv('dc.description.abstract').substring(0, 600),
           url: mv('dc.identifier.uri') || 'https://repository.daystar.ac.ke',
-        });
+        };
+        if (isCourseRecord(rec)) continue;
+        records.push(rec);
       }
       console.log(`[Harvest] REST page ${page} fetched ${records.length} records so far`);
       page++;
@@ -174,7 +216,7 @@ async function harvestOAI() {
         let url = g('dc:identifier');
         if (!url.startsWith('http')) url = `https://repository.daystar.ac.ke/handle/${url}`;
         
-        records.push({
+        const rawRec = {
           title: g('dc:title'),
           authors: g('dc:contributor'),
           year: g('dc:date').substring(0, 4),
@@ -184,7 +226,9 @@ async function harvestOAI() {
           subject: g('dc:subject'),
           abstract: g('dc:description').substring(0, 600),
           url,
-        });
+        };
+        if (isCourseRecord(rawRec)) continue;
+        records.push(rawRec);
       }
 
       token = listRec.resumptionToken?.[0]?._ || null;
@@ -258,5 +302,6 @@ module.exports = {
   harvestREST,
   harvestOAI,
   cleanRecord,
-  normaliseRow
+  normaliseRow,
+  isCourseRecord
 };

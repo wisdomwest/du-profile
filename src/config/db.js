@@ -71,7 +71,7 @@ function dbAll(sql, params = []) {
  */
 async function initDB() {
   console.log('[DB] Running initialization routines...');
-  
+
   // Table: publications
   await dbRun(`CREATE TABLE IF NOT EXISTS publications (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,8 +103,84 @@ async function initDB() {
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_pubs_year ON publications(year);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_pubs_type ON publications(type);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_pubs_school_year ON publications(school, year);`);
-  
+
+  // Clean up any existing course outlines, syllabus, or exam papers
+  await pruneExistingCourses();
+
   console.log('[DB] Database initialization complete.');
+}
+
+/**
+ * Local helper to identify course outline, syllabus, and exam records for pruning.
+ */
+function isCourseRecord(r) {
+  if (!r) return false;
+  const title = (r.title || '').trim();
+  const authors = (r.authors || '').trim();
+
+  // 1. Matches course codes: 3-4 letters followed by optional spaces, then a digit (or O/o as fallback) and 2 digits (plus optional letters)
+  const courseCodeRegex = /^[A-Z]{3,4}\s*[0-9O]\d{2}/i;
+  if (courseCodeRegex.test(title)) {
+    return true;
+  }
+
+  // 2. Authors matches 'Daystar University' exactly (case-insensitive)
+  if (authors.toLowerCase() === 'daystar university') {
+    return true;
+  }
+
+  // 3. Authors contains 'Department of' and 'School of' in capitalized/any case
+  const authorsUpper = authors.toUpperCase();
+  if (authorsUpper.includes('DEPARTMENT OF') && authorsUpper.includes('SCHOOL OF')) {
+    return true;
+  }
+
+  // 4. Matches standard course outline / syllabus / marking scheme titles
+  const titleLower = title.toLowerCase();
+  if (
+    titleLower.includes('course outline') ||
+    titleLower.includes('marking scheme') ||
+    titleLower.includes('course syllabus') ||
+    titleLower.includes('question paper') ||
+    titleLower.includes('exam paper') ||
+    titleLower.includes('examination paper')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Scans the database and prunes all pre-existing course records on startup.
+ */
+async function pruneExistingCourses() {
+  console.log('[DB] Scanning database to prune any existing course records...');
+  try {
+    const rows = await dbAll('SELECT id, title, authors, publisher FROM publications');
+    const courseIds = [];
+    for (const r of rows) {
+      if (isCourseRecord(r)) {
+        courseIds.push(r.id);
+      }
+    }
+
+    if (courseIds.length > 0) {
+      console.log(`[DB] Found ${courseIds.length} existing course records in database. Pruning...`);
+      // Delete in chunks to avoid parameter limit issues
+      const chunkSize = 500;
+      for (let i = 0; i < courseIds.length; i += chunkSize) {
+        const chunk = courseIds.slice(i, i + chunkSize);
+        const placeholders = chunk.map(() => '?').join(',');
+        await dbRun(`DELETE FROM publications WHERE id IN (${placeholders})`, chunk);
+      }
+      console.log(`[DB] Successfully pruned ${courseIds.length} course records from database.`);
+    } else {
+      console.log('[DB] No existing course records found in database.');
+    }
+  } catch (err) {
+    console.error('[DB] Failed to prune existing course records:', err.message);
+  }
 }
 
 module.exports = {

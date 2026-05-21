@@ -14,7 +14,6 @@ router.get('/schools', publicationsController.getSchools);
 router.get('/publications', publicationsController.getPublications);
 router.get('/stats', publicationsController.getStats);
 router.get('/export-csv', publicationsController.exportCSV);
-router.delete('/publications', publicationsController.clearDatabase);
 
 router.post('/upload-csv', upload.single('file'), publicationsController.uploadCSV);
 router.post('/harvest', publicationsController.harvest);

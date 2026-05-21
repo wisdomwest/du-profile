@@ -113,7 +113,6 @@
     <button class="mnb" id="tab-sdg" onclick="goTo('sec-sdg', this)">SDGs Mapping</button>
     <button class="mnb" id="tab-schools" onclick="goTo('sec-schools', this)">School Profiles</button>
     <button class="mnb" id="tab-faculty" onclick="goTo('sec-faculty', this)">Faculty Cards</button>
-    <button class="mnb" id="tab-stats" onclick="goTo('sec-stats', this)">Logs &amp; Settings</button>
   </nav>
 
   <!-- CONTENT VIEWPORTS -->
@@ -258,38 +257,6 @@
       <p class="sec-sub">Automatically constructed faculty publications summary cards based on repository outputs.</p>
       
       <div id="faculty-cards"></div>
-    </section>
-
-    <!-- DETAILED AUDIT AND LOGS SECTION -->
-    <section class="sec-block" id="sec-stats">
-      <h3 class="sec-title">Logs &amp; Settings</h3>
-      <p class="sec-sub">System maintenance audits, DSpace harvesting logs, and direct database optimization commands.</p>
-      
-      <div class="two-col">
-        <!-- System Logs -->
-        <article class="card" id="harvest-logs-card">
-          <h4 style="font-family:'Outfit'; font-size:14px; font-weight:700; margin-bottom:12px; color:var(--neutral-dark)">Recent Harvest Events</h4>
-          <div id="harvest-log-rows">
-            <!-- Dynamically populated via backend -->
-          </div>
-        </article>
-
-        <!-- Direct Actions -->
-        <article class="card" id="db-settings-card">
-          <h4 style="font-family:'Outfit'; font-size:14px; font-weight:700; margin-bottom:12px; color:var(--neutral-dark)">Database Maintenance</h4>
-          <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px">
-            Perform administrative tasks, database maintenance, or reset the prototype environment fields.
-          </p>
-          <div style="display:flex; gap:10px; flex-wrap:wrap">
-            <button class="btn-import btn-accent-theme" id="clear-database-btn" onclick="clearDatabase()">
-              Clear Database
-            </button>
-            <button class="btn-import btn-secondary-theme" id="reseed-btn" onclick="fetchDataAndRebuild()" style="color:var(--neutral-dark); border-color:var(--border-color)">
-              Refresh View
-            </button>
-          </div>
-        </article>
-      </div>
     </section>
 
   </main>
