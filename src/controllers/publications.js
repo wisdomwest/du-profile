@@ -1,7 +1,7 @@
 const fs = require('fs');
 const csvParse = require('csv-parser');
 const { dbAll, dbRun } = require('../config/db');
-const { insertPublications, harvestREST, harvestOAI, cleanRecord } = require('../services/harvest');
+const { insertPublications, harvestREST, harvestOAI, cleanRecord, detectSchool } = require('../services/harvest');
 const { getAIInsight, performSDGReanalysis } = require('../services/ai');
 
 // School configuration mapping (as defined in original server.js)
@@ -39,6 +39,7 @@ const SCHOOL_COMMUNITIES = [
     ids: []
   }
 ];
+let harvestInProgress = false;
 
 /**
  * Clean up uploaded files securely.
@@ -179,6 +180,11 @@ async function harvest(req, res) {
     ? SCHOOL_COMMUNITIES.find(s => s.code === schoolCode)
     : null;
 
+  if (harvestInProgress) {
+    return res.status(409).json({ error: 'A harvest operation is already in progress. Please wait for it to complete.' });
+  }
+  harvestInProgress = true;
+
   try {
     let rawRecords = [];
 
@@ -188,27 +194,26 @@ async function harvest(req, res) {
         const recs = await harvestREST(communityId, school.code);
         rawRecords = rawRecords.concat(recs);
       }
-      
-      // Strict senior-developer level de-duplication routines
-      const seenUrl = new Set();
-      const seenTitle = new Set();
-      rawRecords = rawRecords.filter(r => {
-        const url = r.url || '';
-        const titleKey = (r.title || '').trim().toLowerCase().substring(0, 80);
-        if (seenUrl.has(url) && url !== 'https://repository.daystar.ac.ke') return false;
-        if (seenTitle.has(titleKey) && titleKey.length > 5) return false;
-        seenUrl.add(url);
-        seenTitle.add(titleKey);
-        return true;
-      });
     } else if (school) {
-      // School has no UUID configurations - fallback to OAI and filter by code
-      rawRecords = await harvestOAI();
-      rawRecords = rawRecords.filter(r => r.school === schoolCode);
+      // School has no UUID configurations - REST keyword search fallback (e.g. SMT theology search)
+      rawRecords = await harvestREST(null, school.code, 'theology OR mission OR biblical OR church OR christian OR religion OR pastor');
     } else {
-      // All schools - full OAI-PMH harvest
-      rawRecords = await harvestOAI();
+      // All schools - full DSpace REST Search global harvest
+      rawRecords = await harvestREST(null, null);
     }
+
+    // Strict senior-developer level de-duplication routines across all records
+    const seenUrl = new Set();
+    const seenTitle = new Set();
+    rawRecords = rawRecords.filter(r => {
+      const url = r.url || '';
+      const titleKey = (r.title || '').trim().toLowerCase().substring(0, 80);
+      if (seenUrl.has(url) && url !== 'https://repository.daystar.ac.ke' && url !== '') return false;
+      if (seenTitle.has(titleKey) && titleKey.length > 5) return false;
+      seenUrl.add(url);
+      seenTitle.add(titleKey);
+      return true;
+    });
 
     const cleaned = rawRecords.map(r => cleanRecord(r, school?.code || ''));
     const count = await insertPublications(cleaned, school ? 'rest' : 'oai', school?.name || 'All', school?.code || null);
@@ -217,6 +222,8 @@ async function harvest(req, res) {
   } catch (err) {
     console.error('[Harvest Controller Error]:', err);
     res.status(500).json({ error: err.message });
+  } finally {
+    harvestInProgress = false;
   }
 }
 
