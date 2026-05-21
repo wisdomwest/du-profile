@@ -3,7 +3,8 @@ node_modules/
 uploads/
 venv/
 .env
-*.db
+*.db-shm
+*.db-wal
 *.txt
 *.docx
 *.md
