@@ -176,7 +176,8 @@ async function uploadCSV(req, res) {
  */
 async function harvest(req, res) {
   const { schoolCode } = req.body || {};
-  const school = schoolCode && schoolCode !== 'all'
+  const isAll = !schoolCode || schoolCode === 'all';
+  const school = !isAll
     ? SCHOOL_COMMUNITIES.find(s => s.code === schoolCode)
     : null;
 
@@ -186,23 +187,57 @@ async function harvest(req, res) {
   harvestInProgress = true;
 
   try {
-    let rawRecords = [];
+    let totalInserted = 0;
 
+    if (isAll) {
+      // Harvest each school individually so every record gets its correct school code
+      for (const sc of SCHOOL_COMMUNITIES) {
+        console.log(`[Harvest] Starting school: ${sc.code}`);
+        let schoolRecords = [];
+
+        if (sc.ids.length > 0) {
+          for (const communityId of sc.ids) {
+            const recs = await harvestREST(communityId, sc.code);
+            schoolRecords = schoolRecords.concat(recs);
+          }
+        } else {
+          // SMT fallback — keyword search
+          schoolRecords = await harvestREST(null, sc.code, 'theology OR mission OR biblical OR church OR christian OR religion OR pastor');
+        }
+
+        // De-duplicate within this school's records
+        const seenUrl = new Set();
+        const seenTitle = new Set();
+        schoolRecords = schoolRecords.filter(r => {
+          const url = r.url || '';
+          const titleKey = (r.title || '').trim().toLowerCase().substring(0, 80);
+          if (seenUrl.has(url) && url !== 'https://repository.daystar.ac.ke' && url !== '') return false;
+          if (seenTitle.has(titleKey) && titleKey.length > 5) return false;
+          seenUrl.add(url);
+          seenTitle.add(titleKey);
+          return true;
+        });
+
+        const cleaned = schoolRecords.map(r => cleanRecord(r, sc.code));
+        const inserted = await insertPublications(cleaned, 'rest', sc.name, sc.code);
+        totalInserted += inserted;
+        console.log(`[Harvest] ${sc.code}: inserted ${inserted} records`);
+      }
+
+      return res.json({ message: `Harvested ${totalInserted} records across all schools`, count: totalInserted });
+    }
+
+    // Single school harvest
+    let rawRecords = [];
     if (school && school.ids.length > 0) {
-      // DSpace REST Harvesting per school communities
       for (const communityId of school.ids) {
         const recs = await harvestREST(communityId, school.code);
         rawRecords = rawRecords.concat(recs);
       }
     } else if (school) {
-      // School has no UUID configurations - REST keyword search fallback (e.g. SMT theology search)
       rawRecords = await harvestREST(null, school.code, 'theology OR mission OR biblical OR church OR christian OR religion OR pastor');
-    } else {
-      // All schools - full DSpace REST Search global harvest
-      rawRecords = await harvestREST(null, null);
     }
 
-    // Strict senior-developer level de-duplication routines across all records
     const seenUrl = new Set();
     const seenTitle = new Set();
     rawRecords = rawRecords.filter(r => {
@@ -216,9 +251,9 @@ async function harvest(req, res) {
     });
 
     const cleaned = rawRecords.map(r => cleanRecord(r, school?.code || ''));
-    const count = await insertPublications(cleaned, school ? 'rest' : 'oai', school?.name || 'All', school?.code || null);
-    
-    res.json({ message: `Harvested ${count} records from ${school?.name || 'all communities'}`, count });
+    const count = await insertPublications(cleaned, 'rest', school?.name || 'Unknown', school?.code || null);
+
+    res.json({ message: `Harvested ${count} records from ${school?.name || 'school'}`, count });
   } catch (err) {
     console.error('[Harvest Controller Error]:', err);
     res.status(500).json({ error: err.message });

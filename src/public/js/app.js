@@ -3,6 +3,7 @@
    ========================================================================== */
 
 let PUBS = [];
+let ALL_PUBS = [];
 let sChart = null;
 let tChart = null;
 let dtInst = null;
@@ -428,8 +429,8 @@ function updateStats(logData = []) {
   const dbStatusText = document.getElementById('db-status');
   if (dbStatusText) {
     dbStatusText.textContent = total > 0 
-      ? `${total} active publications in SQLite database` 
-      : 'No database records found &bull; import publications above';
+      ? `${total} active publications in profile` 
+      : 'No database records found • import publications above';
   }
 
 }
@@ -449,6 +450,20 @@ function rebuildAll(logData = []) {
 }
 
 /**
+ * Filters publications by school and year dropdown menus.
+ */
+function applyFilters() {
+  const school = document.getElementById('sc-filter').value;
+  const year = document.getElementById('yr-filter').value;
+  PUBS = ALL_PUBS.filter(p => {
+    const matchSchool = (school === 'all' || p.school === school);
+    const matchYear = (year === 'all' || String(p.year) === year);
+    return matchSchool && matchYear;
+  });
+  rebuildAll([]);
+}
+
+/**
  * Loads publications and logs simultaneously and updates UI.
  */
 function fetchDataAndRebuild() {
@@ -461,8 +476,8 @@ function fetchDataAndRebuild() {
     fetch('/api/stats').then(r => r.json())
   ])
   .then(([publications, statistics]) => {
-    PUBS = publications;
-    rebuildAll(statistics.log);
+    ALL_PUBS = publications;
+    applyFilters();
   })
   .catch(err => {
     console.error('[Client App] Initialization fetch failed:', err);

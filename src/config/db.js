@@ -103,6 +103,9 @@ async function initDB() {
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_pubs_year ON publications(year);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_pubs_type ON publications(type);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_pubs_school_year ON publications(school, year);`);
+  
+  // Partial unique index for robust UPSERT, ignoring empty/default URLs
+  await dbRun(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pubs_unique_url ON publications(url) WHERE url != 'https://repository.daystar.ac.ke' AND url != '';`);
 
   // Clean up any existing course outlines, syllabus, or exam papers
   await pruneExistingCourses();

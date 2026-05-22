@@ -227,6 +227,14 @@ async function harvestREST(communityId, schoolCode, query = null) {
       for (const obj of objects) {
         const meta = obj?._embedded?.indexableObject?.metadata || {};
         const mv = k => (meta[k] || []).map(v => v.value).join(' | ');
+        // Prefer the DSpace repository URL over any external URLs (e.g. YouTube)
+        const allUris = (meta['dc.identifier.uri'] || [])
+          .flatMap(v => (v.value || '').split(/[\s|]+/))
+          .map(u => u.trim())
+          .filter(Boolean);
+        const preferredUrl = allUris.find(u => u.includes('repository.daystar.ac.ke'))
+          || allUris.find(u => u.startsWith('http'))
+          || 'https://repository.daystar.ac.ke';
         const rec = {
           title: mv('dc.title'),
           authors: mv('dc.contributor.author'),
@@ -236,7 +244,7 @@ async function harvestREST(communityId, schoolCode, query = null) {
           publisher: mv('dc.publisher'),
           subject: mv('dc.subject'),
           abstract: mv('dc.description.abstract').substring(0, 600),
-          url: mv('dc.identifier.uri') || 'https://repository.daystar.ac.ke',
+          url: preferredUrl,
         };
         if (isCourseRecord(rec)) continue;
         records.push(rec);
@@ -288,7 +296,13 @@ async function harvestOAI() {
         const dc = rec.metadata?.[0]?.['oai_dc:dc']?.[0];
         if (!dc) continue;
         const g = tag => (dc[tag] || []).join(' | ');
-        let url = g('dc:identifier');
+        const identifiers = (dc['dc:identifier'] || [])
+          .flatMap(v => String(v).split(/[\s|]+/))
+          .map(u => u.trim())
+          .filter(Boolean);
+        let url = identifiers.find(u => u.includes('repository.daystar.ac.ke'))
+          || identifiers.find(u => u.startsWith('http'))
+          || (identifiers[0] || 'https://repository.daystar.ac.ke');
         if (!url.startsWith('http')) url = `https://repository.daystar.ac.ke/handle/${url}`;
         
         const rawRec = {
@@ -399,7 +413,10 @@ function cleanRecord(rec, schoolCode) {
     year: (() => {
       const raw = String(rec.year || '').trim();
       const match = raw.match(/(20\d{2}|19\d{2}|198\d|199\d)/);
-      return match ? parseInt(match[1]) : 2024;
+      if (!match) return new Date().getFullYear();
+      const yr = parseInt(match[1]);
+      const currentYear = new Date().getFullYear();
+      return yr > currentYear ? currentYear : yr;
     })(),
     school: schoolCode || rec.school || detectSchool(rec),
     type,
