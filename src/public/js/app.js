@@ -4,6 +4,7 @@
 
 let PUBS = [];
 let ALL_PUBS = [];
+let FACULTY_LIST = [];
 let sChart = null;
 let tChart = null;
 let dtInst = null;
@@ -358,9 +359,9 @@ function buildFaculty() {
     const card = document.createElement('div');
     card.className = 'fp-card';
     card.innerHTML = `
-      <div class="fp-header">
+      <div class="fp-header" style="position:relative; width: 100%;">
         <div class="fp-avatar">${initials}</div>
-        <div>
+        <div style="flex-grow:1; padding-right:80px;">
           <h4 class="fp-name">${author}</h4>
           <div class="fp-role">Faculty &bull; School of ${school || 'Other'}</div>
           <div class="fp-badges">
@@ -368,6 +369,7 @@ function buildFaculty() {
             <span class="badge bg" style="font-size:9px">${list.length} Records</span>
           </div>
         </div>
+        <a href="/faculty/${slugify(author)}" target="_blank" style="position:absolute; top:16px; right:16px; font-size:11px; color:var(--primary); font-weight:700; text-decoration:none;">View profile &rarr;</a>
       </div>
       <div class="fp-body">
         <div class="fp-metrics">
@@ -447,6 +449,8 @@ function rebuildAll(logData = []) {
   buildSDG();
   buildSchools();
   buildFaculty();
+  drawNetwork();
+  generateTeam();
 }
 
 /**
@@ -473,10 +477,12 @@ function fetchDataAndRebuild() {
   // Concurrent fetch using node endpoints
   Promise.all([
     fetch('/api/publications').then(r => r.json()),
-    fetch('/api/stats').then(r => r.json())
+    fetch('/api/stats').then(r => r.json()),
+    fetch('/api/faculty').then(r => r.json())
   ])
-  .then(([publications, statistics]) => {
+  .then(([publications, statistics, faculty]) => {
     ALL_PUBS = publications;
+    FACULTY_LIST = faculty;
     applyFilters();
   })
   .catch(err => {
@@ -732,9 +738,16 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(err => console.error('[Client Init] Schools list fetch failed:', err));
 });
 
-// Scroll Event sync to highlight tabs
+function scrollSection(id, btn) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.anchor-link').forEach(a => a.classList.remove('here'));
+  if (btn) btn.classList.add('here');
+}
+
+// Scroll Event sync to highlight tabs & sub-anchors
 window.addEventListener('scroll', () => {
-  const sections = ['sec-charts', 'sec-pubs', 'sec-recent', 'sec-sdg', 'sec-schools', 'sec-faculty'];
+  const sections = ['sec-charts', 'sec-pubs', 'sec-recent', 'sec-sdg', 'sec-schools', 'sec-faculty', 'sec-network', 'sec-teambuilder'];
   const tabs = document.querySelectorAll('.mnb');
   
   sections.forEach((id, idx) => {
@@ -747,4 +760,673 @@ window.addEventListener('scroll', () => {
       if (tabs[idx]) tabs[idx].classList.add('active');
     }
   });
+
+  // Dynamic sub-anchor scroll sync highlighting
+  const subSections = [
+    { id: 'sec-network', anchorId: 'anchor-net' },
+    { id: 'sec-faculty', anchorId: 'anchor-profile' },
+    { id: 'sec-teambuilder', anchorId: 'anchor-team' }
+  ];
+  let activeAnchor = null;
+  for (const s of subSections) {
+    const el = document.getElementById(s.id);
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= 180 && rect.bottom > 100) {
+        activeAnchor = s.anchorId;
+        break;
+      }
+    }
+  }
+  if (activeAnchor) {
+    document.querySelectorAll('.anchor-link').forEach(a => {
+      if (a.id === activeAnchor) {
+        a.classList.add('here');
+      } else {
+        a.classList.remove('here');
+      }
+    });
+  }
+});
+
+/* ==========================================================================
+   PHASE 9: PREMIUM ACADEMIC ADDITIONS
+   ========================================================================== */
+
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/* ── COLLABORATION NETWORK MAP ── */
+function drawNetwork() {
+  const svg = document.getElementById('networkSVG');
+  if (!svg) return;
+  
+  const W = svg.parentElement.offsetWidth || 800;
+  const H = 600;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+  
+  const clusterFilter = document.getElementById('net-cluster-filter')?.value || 'all';
+  const yearFilter = document.getElementById('net-year-filter')?.value || 'all';
+  const densityFilter = document.getElementById('net-density-filter')?.value || 'medium';
+  
+  const showInternal = document.getElementById('toggle-internal')?.classList.contains('on');
+  const showExternal = document.getElementById('toggle-external')?.classList.contains('on');
+  const showIsolated = document.getElementById('toggle-isolated')?.classList.contains('on');
+  
+  // 1. Filter publications by year range filter with highly robust date/year parsing
+  let netPubs = ALL_PUBS;
+  if (yearFilter !== 'all') {
+    const [startYear, endYear] = yearFilter.split(/[-–]/).map(Number);
+    netPubs = ALL_PUBS.filter(p => {
+      if (!p.year) return false;
+      const yr = parseInt(String(p.year).substring(0, 4), 10);
+      return !isNaN(yr) && yr >= startYear && yr <= endYear;
+    });
+  }
+  
+  // 2. Count publication outputs per Daystar researcher within year range filter
+  const authorPubs = {};
+  netPubs.forEach(p => {
+    const authorList = (p.authors || '').split(/[;|]/).map(a => a.trim()).filter(a => a.length > 3);
+    authorList.forEach(a => {
+      authorPubs[a] = (authorPubs[a] || 0) + 1;
+    });
+  });
+  
+  // 3. Keep Daystar researchers based on densityFilter thresholding
+  let minPubs = 3; // 'medium'
+  if (densityFilter === 'high') {
+    minPubs = yearFilter !== 'all' ? 1 : 2;
+  } else if (densityFilter === 'low') {
+    minPubs = yearFilter !== 'all' ? 3 : 5;
+  } else {
+    minPubs = yearFilter !== 'all' ? 2 : 3; // 'medium'
+  }
+  const activeAuthors = Object.keys(authorPubs).filter(a => authorPubs[a] >= minPubs);
+  const researcherNodes = [];
+  const nameToNode = {};
+  
+  activeAuthors.forEach(author => {
+    const myPubs = ALL_PUBS.filter(p => (p.authors || '').includes(author));
+    const schoolCounts = {};
+    myPubs.forEach(p => {
+      if (p.school) schoolCounts[p.school] = (schoolCounts[p.school] || 0) + 1;
+    });
+    
+    let primarySchool = 'Other';
+    let maxSc = 0;
+    Object.entries(schoolCounts).forEach(([sc, count]) => {
+      if (count > maxSc) {
+        maxSc = count;
+        primarySchool = sc;
+      }
+    });
+    
+    // Apply clusterFilter
+    if (clusterFilter !== 'all' && primarySchool !== clusterFilter) return;
+    
+    const initials = author.split(' ').map(w => w[0] || '').join('').substring(0, 2).toUpperCase();
+    
+    const node = {
+      id: author,
+      label: author,
+      initials,
+      type: 'daystar',
+      cluster: primarySchool,
+      pubCount: authorPubs[author],
+      r: Math.min(22, 10 + authorPubs[author] * 1.5)
+    };
+    
+    researcherNodes.push(node);
+    nameToNode[author] = node;
+  });
+  
+  // 4. Detect external institutions based on keywords
+  const extCounts = {};
+  const researcherToExt = {};
+  
+  const extDef = [
+    { key: 'KEMRI', name: 'KEMRI', match: /kemri|kenya medical research/i },
+    { key: 'UON', name: 'Univ. of Nairobi', match: /nairobi|uon/i },
+    { key: 'MOH', name: 'MOH Kenya', match: /moh|ministry of health/i },
+    { key: 'Kenyatta', name: 'Kenyatta Univ.', match: /kenyatta/i },
+    { key: 'Jkuat', name: 'JKUAT', match: /jkuat|jomo kenyatta/i },
+    { key: 'WHO', name: 'WHO', match: /world health|who/i },
+    { key: 'CDC', name: 'CDC', match: /cdc|centers for disease/i },
+    { key: 'AMREF', name: 'AMREF', match: /amref/i },
+    { key: 'IDRC', name: 'IDRC', match: /idrc/i },
+    { key: 'Wellcome', name: 'Wellcome Trust', match: /wellcome/i }
+  ];
+  
+  netPubs.forEach(p => {
+    const textToMatch = `${p.publisher || ''} ${p.title || ''} ${p.abstract || ''} ${p.authors || ''}`;
+    const matchedExts = [];
+    extDef.forEach(ext => {
+      if (ext.match.test(textToMatch)) matchedExts.push(ext.name);
+    });
+    
+    const pubAuthors = (p.authors || '').split(/[;|]/).map(a => a.trim()).filter(a => a.length > 3);
+    pubAuthors.forEach(a => {
+      if (nameToNode[a]) {
+        matchedExts.forEach(extName => {
+          extCounts[extName] = (extCounts[extName] || 0) + 1;
+          if (!researcherToExt[a]) researcherToExt[a] = {};
+          researcherToExt[a][extName] = (researcherToExt[a][extName] || 0) + 1;
+        });
+      }
+    });
+  });
+  
+  const externalNodes = [];
+  Object.keys(extCounts).forEach(extName => {
+    const isConnected = researcherNodes.some(n => researcherToExt[n.id] && researcherToExt[n.id][extName]);
+    if (isConnected) {
+      externalNodes.push({
+        id: extName,
+        label: extName,
+        type: 'ext',
+        cluster: 'ext',
+        pubCount: extCounts[extName],
+        r: 10
+      });
+    }
+  });
+  
+  // 5. Co-authorship weights (internal & external links)
+  const coauthorshipWeights = {};
+  netPubs.forEach(p => {
+    const pubAuthors = (p.authors || '').split(/[;|]/).map(a => a.trim()).filter(a => a.length > 3);
+    const visibleAuthors = pubAuthors.filter(a => nameToNode[a]);
+    
+    for (let i = 0; i < visibleAuthors.length; i++) {
+      for (let j = i + 1; j < visibleAuthors.length; j++) {
+        const u = visibleAuthors[i];
+        const v = visibleAuthors[j];
+        const key = u < v ? `${u}|||${v}` : `${v}|||${u}`;
+        coauthorshipWeights[key] = (coauthorshipWeights[key] || 0) + 1;
+      }
+    }
+  });
+  
+  const edges = [];
+  if (showInternal) {
+    Object.entries(coauthorshipWeights).forEach(([key, w]) => {
+      const [u, v] = key.split('|||');
+      edges.push({ s: u, t: v, w, type: 'internal' });
+    });
+  }
+  
+  if (showExternal) {
+    Object.entries(researcherToExt).forEach(([author, exts]) => {
+      if (nameToNode[author]) {
+        Object.entries(exts).forEach(([extName, w]) => {
+          edges.push({ s: author, t: extName, w, type: 'external' });
+        });
+      }
+    });
+  }
+  
+  // Filter out isolated nodes if filter disabled
+  const nodeEdgeCounts = {};
+  edges.forEach(e => {
+    nodeEdgeCounts[e.s] = (nodeEdgeCounts[e.s] || 0) + 1;
+    nodeEdgeCounts[e.t] = (nodeEdgeCounts[e.t] || 0) + 1;
+  });
+  
+  const filterNodeList = (list) => {
+    return list.filter(n => {
+      const edgeCount = nodeEdgeCounts[n.id] || 0;
+      return edgeCount > 0 || showIsolated;
+    });
+  };
+  
+  const shownResearchers = filterNodeList(researcherNodes);
+  const shownExternals = showExternal ? filterNodeList(externalNodes) : [];
+  const finalNodes = [...shownResearchers, ...shownExternals];
+  
+  // 6. Mathematical layout coordinate rendering
+  const cx = W / 2;
+  const cy = H / 2;
+  
+  const schoolList = ["SSEH", "SOC", "SBE", "SHSS", "SON", "SOL", "SASS", "SMT"];
+  const schoolAngles = {};
+  schoolList.forEach((code, idx) => {
+    schoolAngles[code] = idx * (2 * Math.PI / 8) - Math.PI / 2;
+  });
+  
+  // Spread out settings based on whether we filter by a single cluster or show all
+  const isSingleCluster = clusterFilter !== 'all';
+  const R_school = isSingleCluster ? 0 : 180; // Center if single school, else push out to 180px
+  
+  const researchersBySchool = {};
+  shownResearchers.forEach(node => {
+    if (!researchersBySchool[node.cluster]) researchersBySchool[node.cluster] = [];
+    researchersBySchool[node.cluster].push(node);
+  });
+  
+  Object.entries(researchersBySchool).forEach(([schoolCode, list]) => {
+    // If showing only one school, center the school cluster
+    const angle_s = schoolAngles[schoolCode] !== undefined ? schoolAngles[schoolCode] : 0;
+    const ccx = isSingleCluster ? cx : cx + R_school * Math.cos(angle_s);
+    const ccy = isSingleCluster ? cy : cy + R_school * Math.sin(angle_s);
+    
+    const N_sc = list.length;
+    // Determine cluster spread radius
+    const r_res = isSingleCluster 
+      ? Math.min(220, 90 + N_sc * 4) // Much wider circle for single cluster view
+      : Math.min(100, 35 + N_sc * 3); // Spaced out sub-circles in multi-cluster view
+      
+    list.forEach((node, idx) => {
+      if (N_sc === 1) {
+        node.x = ccx;
+        node.y = ccy;
+      } else {
+        // Stagger nodes in concentric rings for large clusters to prevent overlaps
+        let current_r = r_res;
+        if (N_sc > 6) {
+          current_r = (idx % 2 === 0) ? r_res * 0.78 : r_res * 1.22;
+        }
+        const angle_r = (idx * 2 * Math.PI / N_sc);
+        node.x = ccx + current_r * Math.cos(angle_r);
+        node.y = ccy + current_r * Math.sin(angle_r);
+      }
+    });
+  });
+  
+  const N_ext = shownExternals.length;
+  // If single school, push external partners to outer circle of 275px, else 260px
+  const R_ext = isSingleCluster ? 275 : 260;
+  shownExternals.forEach((node, idx) => {
+    const angle_e = (idx * 2 * Math.PI / N_ext) + Math.PI / 8;
+    node.x = cx + R_ext * Math.cos(angle_e);
+    node.y = cy + R_ext * Math.sin(angle_e);
+  });
+  
+  const nodeMap = {};
+  finalNodes.forEach(n => { nodeMap[n.id] = n; });
+  
+  // Spring-force layout physics simulation (150 iterations) to dynamically spread nodes and prevent overlaps
+  const iterations = 150;
+  const idealLength = 65; // Ideal spring length between connected nodes
+  for (let step = 0; step < iterations; step++) {
+    // 1. Repulsion force between all node pairs to prevent overlaps
+    for (let i = 0; i < finalNodes.length; i++) {
+      const n1 = finalNodes[i];
+      for (let j = i + 1; j < finalNodes.length; j++) {
+        const n2 = finalNodes[j];
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        // Repulsion threshold dynamically scales with node size
+        const minDistance = n1.r + n2.r + 42;
+        if (dist < minDistance) {
+          const force = (minDistance - dist) * 0.12;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          n1.x -= fx;
+          n1.y -= fy;
+          n2.x += fx;
+          n2.y += fy;
+        }
+      }
+    }
+    
+    // 2. Attraction force along co-authorship connections
+    edges.forEach(e => {
+      const sNode = nodeMap[e.s];
+      const tNode = nodeMap[e.t];
+      if (!sNode || !tNode) return;
+      
+      const dx = tNode.x - sNode.x;
+      const dy = tNode.y - sNode.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      
+      if (dist > idealLength) {
+        const force = (dist - idealLength) * 0.035;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        sNode.x += fx;
+        sNode.y += fy;
+        tNode.x -= fx;
+        tNode.y -= fy;
+      }
+    });
+    
+    // 3. Central gravity attraction to keep the graph centered on the canvas
+    finalNodes.forEach(n => {
+      const dx = cx - n.x;
+      const dy = cy - n.y;
+      n.x += dx * 0.008;
+      n.y += dy * 0.008;
+    });
+  }
+  
+  // 4. Force strict boundaries to keep nodes inside the SVG viewport
+  finalNodes.forEach(n => {
+    n.x = Math.max(n.r + 25, Math.min(W - n.r - 25, n.x));
+    n.y = Math.max(n.r + 25, Math.min(H - n.r - 25, n.y));
+  });
+  
+  const schoolColors = {
+    SSEH: '#25AAE1', SOC: '#1D9E75', SBE: '#EF9F27', SHSS: '#E0606F',
+    SON: '#7C3AED', SOL: '#BA7517', SASS: '#64748B', SMT: '#639922',
+    ext: '#888780'
+  };
+  
+  let drawHtml = '';
+  edges.forEach(e => {
+    const sNode = nodeMap[e.s];
+    const tNode = nodeMap[e.t];
+    if (!sNode || !tNode) return;
+    
+    const sw = e.type === 'internal' 
+      ? (e.w >= 3 ? 3.0 : e.w === 2 ? 1.8 : 0.8) 
+      : 1.0;
+    const op = e.type === 'internal' 
+      ? (e.w >= 3 ? 0.7 : 0.4) 
+      : 0.25;
+    const strokeColor = e.type === 'internal' ? '#003366' : '#888780';
+    const strokeDash = e.type === 'external' ? '3,3' : 'none';
+    
+    drawHtml += `<line x1="${sNode.x}" y1="${sNode.y}" x2="${tNode.x}" y2="${tNode.y}" stroke="${strokeColor}" stroke-width="${sw}" stroke-opacity="${op}" stroke-dasharray="${strokeDash}"/>`;
+  });
+  
+  finalNodes.forEach((n, idx) => {
+    const col = schoolColors[n.cluster] || '#888780';
+    const stroke = n.type === 'daystar' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.15)';
+    const strokeWidth = n.type === 'daystar' ? 1.5 : 1.0;
+    const initials = n.initials || '';
+    
+    // Stagger labels vertically to prevent horizontal overlaps
+    const labelYOffset = n.type === 'daystar' 
+      ? n.r + (idx % 2 === 0 ? 12 : 23) 
+      : n.r + 12;
+      
+    drawHtml += `
+      <g class="net-node" style="cursor:pointer;" onmouseenter="showTT(event, '${n.id}', '${n.label.replace(/'/g, "\\'")}', '${n.cluster}')" onmouseleave="hideTT()">
+        <circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${col}" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${n.type==='daystar'?1:0.8}"/>
+        ${n.type === 'daystar' && n.r > 12 ? `<text x="${n.x}" y="${n.y+4}" fill="#FFF" font-family="'Outfit', sans-serif" font-size="9px" font-weight="700" text-anchor="middle" pointer-events="none">${initials}</text>` : ''}
+        <text class="node-label" x="${n.x}" y="${n.y+labelYOffset}" text-anchor="middle" fill="#2d3748" font-family="'Inter', sans-serif" font-size="9px" font-weight="600" style="text-shadow: 0 1px 2px rgba(255,255,255,0.8);">${n.label.split(',')[0]}</text>
+      </g>
+    `;
+  });
+  
+  svg.innerHTML = drawHtml;
+  
+  const totalExt = shownExternals.length;
+  const totalIsolated = finalNodes.filter(n => (nodeEdgeCounts[n.id] || 0) === 0).length;
+  
+  document.getElementById('stat-nodes').textContent = shownResearchers.length;
+  document.getElementById('stat-edges').textContent = edges.length;
+  document.getElementById('stat-ext').textContent = totalExt;
+  document.getElementById('stat-isolated').textContent = totalIsolated;
+}
+
+function showTT(e, id, label, cluster) {
+  const tt = document.getElementById('netTooltip');
+  const canvas = document.getElementById('netCanvas');
+  if (!tt || !canvas) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  
+  tt.style.left = (cx + 14) + 'px';
+  tt.style.top = (cy - 20) + 'px';
+  
+  document.getElementById('tt-name').textContent = label;
+  
+  const sub = document.getElementById('tt-sub');
+  const tags = document.getElementById('tt-tags');
+  
+  if (cluster === 'ext') {
+    sub.textContent = 'External institution collaborator';
+    tags.innerHTML = `<span class="badge bgr">External Partner</span>`;
+  } else {
+    sub.textContent = `School of ${cluster}`;
+    const researcher = FACULTY_LIST.find(f => f.name === id);
+    const pubCount = researcher ? researcher.pubCount : 2;
+    tags.innerHTML = `
+      <span class="badge bg" style="margin-right:4px;">${pubCount} Publications</span>
+      ${sb(cluster)}
+    `;
+  }
+  
+  tt.classList.add('show');
+}
+
+function hideTT() {
+  const tt = document.getElementById('netTooltip');
+  if (tt) tt.classList.remove('show');
+}
+
+function filterNetwork(v) {
+  drawNetwork();
+}
+
+window.addEventListener('resize', () => {
+  const svg = document.getElementById('networkSVG');
+  if (svg && svg.getBoundingClientRect().height > 0) {
+    drawNetwork();
+  }
+});
+
+/* ── CONSORTIUM TEAM BUILDER ── */
+function generateTeam() {
+  const container = document.getElementById('team-results-container');
+  if (!container) return;
+  
+  const selectedClusters = Array.from(document.querySelectorAll('#tb-cluster-picker .cluster-option.selected'))
+    .map(el => el.getAttribute('data-cluster'));
+    
+  const selectedSDGs = Array.from(document.querySelectorAll('#tb-sdg-picker .sdg-btn.on'))
+    .map(el => el.getAttribute('data-sdg'));
+    
+  const filterGrant = document.getElementById('tb-filter-grant')?.checked;
+  const filterActive = document.getElementById('tb-filter-active')?.checked;
+  const filterExternal = document.getElementById('tb-filter-external')?.checked;
+  const filterOneSchool = document.getElementById('tb-filter-oneschool')?.checked;
+  
+  if (selectedClusters.length < 2) {
+    container.innerHTML = `
+      <div style="background:rgba(239,68,68,0.06); border:1px dashed rgba(239,68,68,0.2); border-radius:8px; padding:20px; text-align:center; color:#DC2626; font-size:13px; font-weight:600;">
+        ⚠️ Please select at least two target research clusters (schools) to form a consortium.
+      </div>
+    `;
+    return;
+  }
+  
+  const getGrants = (f) => {
+    const grants = [];
+    if (f.pubCount >= 4 && ['SSEH', 'SON', 'SBE'].includes(f.school)) grants.push('NRF');
+    if (f.pubCount >= 3 && ['SOC', 'SBE', 'SASS', 'SHSS'].includes(f.school)) grants.push('IDRC');
+    if (f.pubCount >= 3 && ['SSEH', 'SON', 'SHSS'].includes(f.school)) grants.push('Wellcome');
+    return grants;
+  };
+  
+  const hasExtCollab = (f) => {
+    const myPubs = ALL_PUBS.filter(p => (p.authors || '').includes(f.name));
+    const extRegex = /kemri|nairobi|moh|ministry of health|kenyatta|jkuat|who|world health|cdc|amref|idrc|wellcome/i;
+    return myPubs.some(p => extRegex.test(`${p.publisher || ''} ${p.title || ''} ${p.abstract || ''}`));
+  };
+  
+  const chosenTeam = [];
+  const usedSchools = new Set();
+  
+  selectedClusters.forEach(clusterCode => {
+    let candidates = FACULTY_LIST.filter(f => f.school === clusterCode);
+    
+    if (filterGrant) {
+      candidates = candidates.filter(f => getGrants(f).length > 0);
+    }
+    if (filterActive) {
+      candidates = candidates.filter(f => f.lastActive >= 2023);
+    }
+    if (filterExternal) {
+      candidates = candidates.filter(f => hasExtCollab(f));
+    }
+    if (filterOneSchool) {
+      candidates = candidates.filter(f => !usedSchools.has(f.school));
+    }
+    
+    const scored = candidates.map(f => {
+      const matchingSDGs = f.sdgs.filter(s => selectedSDGs.includes(s));
+      const score = f.pubCount * 2 + f.indexingCount * 3 + (matchingSDGs.length * 10);
+      return { f, score, matchingSDGs };
+    });
+    
+    scored.sort((a, b) => b.score - a.score);
+    if (scored.length > 0) {
+      const best = scored[0];
+      chosenTeam.push(best);
+      usedSchools.add(best.f.school);
+    }
+  });
+  
+  if (chosenTeam.length === 0) {
+    container.innerHTML = `
+      <div style="background:var(--bg-card-alt); border:1px dashed var(--border-color); border-radius:8px; padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">
+        No researchers matched the configured criteria for the selected clusters. Try disabling some filters or adding more publications.
+      </div>
+    `;
+    return;
+  }
+  
+  let resultsHtml = `
+    <div class="tb-results-title" id="team-title">Suggested team — ${chosenTeam.length} researchers across ${new Set(chosenTeam.map(c => c.f.school)).size} clusters</div>
+    <div class="tb-results-sub">Best-matched active researchers for a multi-disciplinary grant application. Based on publication record, SDG alignment, and grant eligibility. Click any researcher to view their full profile.</div>
+  `;
+  
+  const schoolColors = {
+    SSEH: '#25AAE1', SOC: '#1D9E75', SBE: '#EF9F27', SHSS: '#E0606F',
+    SON: '#7C3AED', SOL: '#BA7517', SASS: '#64748B', SMT: '#639922'
+  };
+  
+  chosenTeam.forEach(item => {
+    const f = item.f;
+    const initials = f.name.split(' ').map(w => w[0] || '').join('').substring(0, 2).toUpperCase();
+    const col = schoolColors[f.school] || '#888780';
+    const grants = getGrants(f);
+    const grantBadges = grants.map(g => `<span class="badge b-grant" style="margin-left:4px; background:#FCE7F3; color:#BE185D; border: 1px solid rgba(0,0,0,0.05);">${g} eligible</span>`).join('');
+    
+    const myPubs = ALL_PUBS.filter(p => (p.authors || '').includes(f.name));
+    const textCorpus = myPubs.map(p => `${p.title} ${p.abstract}`).join(' ').toLowerCase();
+    let method = 'Secondary research';
+    if (textCorpus.includes('model') || textCorpus.includes('statistical') || textCorpus.includes('regression') || textCorpus.includes('quantitative')) {
+      method = 'Quantitative';
+    } else if (textCorpus.includes('survey') || textCorpus.includes('interview') || textCorpus.includes('mixed')) {
+      method = 'Mixed methods';
+    } else if (textCorpus.includes('qualitative') || textCorpus.includes('focus group')) {
+      method = 'Qualitative';
+    }
+    
+    const matchesStr = item.matchingSDGs.length > 0 
+      ? `Matches: ${item.matchingSDGs.map(s => `${s} ✓`).join(' ')}`
+      : 'No target SDG matches';
+      
+    resultsHtml += `
+      <div class="team-card">
+        <div class="tc-header">
+          <div class="tc-av" style="background:${col};">${initials}</div>
+          <div>
+            <div class="tc-name">${f.name}</div>
+            <div class="tc-sub">Faculty · ${f.school} · ${f.pubCount} pubs · Last active ${f.lastActive}</div>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+            ${grantBadges}
+            <a href="/faculty/${f.slug}" target="_blank" style="font-size:12px; color:var(--primary); font-weight:700; text-decoration:none;">View profile &rarr;</a>
+          </div>
+        </div>
+        <div class="tc-body">
+          <span class="badge b-cluster" style="background:${col}14; color:${col}; border: 1px solid rgba(0,0,0,0.02);">${f.school} Cluster</span>
+          <span class="badge b-method" style="background:#F1F5F9; color:#475569;">${method}</span>
+          ${f.sdgs.slice(0, 3).map(s => `<span class="badge b-sdg" style="background:#E1F5EE; color:#085041;">${s}</span>`).join('')}
+          <span style="font-size:11px; color:var(--text-muted); margin-left:4px;">${matchesStr}</span>
+          <button class="btn-import btn-primary-theme" style="padding:4px 8px; font-size:10px; margin-left:auto;" onclick="openContactModal('${f.name.replace(/'/g, "\\'")}', 'faculty.${f.slug}@daystar.ac.ke', '${f.school} research')">Contact &rarr;</button>
+        </div>
+      </div>
+    `;
+  });
+  
+  const unionSDGs = [...new Set(chosenTeam.flatMap(item => item.f.sdgs))];
+  const schoolsCovered = [...new Set(chosenTeam.map(item => item.f.school))];
+  const totalPubs = chosenTeam.reduce((sum, item) => sum + item.f.pubCount, 0);
+  const eligibleGrants = [...new Set(chosenTeam.flatMap(item => getGrants(item.f)))];
+  
+  resultsHtml += `
+    <div class="overlap-section">
+      <div class="overlap-title">Team overlap analysis</div>
+      <div class="overlap-row">
+        <span class="overlap-lbl">Shared SDGs</span>
+        <div class="overlap-tags">
+          ${unionSDGs.slice(0, 6).map(s => `<span class="badge b-sdg" style="background:#E1F5EE; color:#085041;">${s}</span>`).join('')}
+          ${unionSDGs.length > 6 ? `<span style="font-size:11px; color:var(--text-muted); align-self:center;">+${unionSDGs.length - 6} more</span>` : ''}
+        </div>
+      </div>
+      <div class="overlap-row">
+        <span class="overlap-lbl">Schools covered</span>
+        <div class="overlap-tags">
+          ${schoolsCovered.map(sc => `<span class="badge b-collab" style="background:${schoolColors[sc]}20; color:${schoolColors[sc]};">${sc}</span>`).join('')}
+        </div>
+      </div>
+      <div class="overlap-row">
+        <span class="overlap-lbl">Combined pubs</span>
+        <div class="overlap-tags">
+          <span style="font-size:13px; font-weight:700; color:var(--neutral-dark);">${totalPubs} publications</span>
+          <span style="font-size:11px; color:var(--text-muted); align-self:center;">across ${chosenTeam.length} researchers</span>
+        </div>
+      </div>
+      <div class="overlap-row">
+        <span class="overlap-lbl">Grant fit</span>
+        <div class="overlap-tags">
+          ${eligibleGrants.map(g => `<span class="badge b-grant" style="background:#FCE7F3; color:#BE185D; border: 1px solid rgba(0,0,0,0.05);">${g}</span>`).join('')}
+          <span style="font-size:11px; color:var(--text-muted); align-self:center;">— team covered by eligibility</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="export-row">
+      <button class="btn-outline" onclick="generateTeam()">↺ Regenerate</button>
+      <button class="btn-outline" onclick="alert('Suggested team configuration saved locally to your session.')">Save team</button>
+      <button class="btn-primary-sm" onclick="openContactModal('DRICE Research Office', 'drice@daystar.ac.ke', 'Multi-disciplinary Consortium')">Email team suggestion to DRICE &rarr;</button>
+    </div>
+  `;
+  
+  container.innerHTML = resultsHtml;
+}
+
+/* ── CONTACT MODAL CONTROL ── */
+function openContactModal(name, email, cluster) {
+  const surname = name.split(',')[0].trim().split(' ')[0];
+  document.getElementById('m-to').textContent = email;
+  document.getElementById('m-surname').textContent = surname;
+  document.getElementById('m-cluster').textContent = cluster;
+  document.getElementById('m-send').onclick = () => {
+    const subj = encodeURIComponent('DRICE Fellowship — Mentorship enquiry');
+    const body = encodeURIComponent('Dear Dr. ' + surname + ',\n\nI am a DRICE Research Fellow (Pilot Cohort 1, May Semester 2026) and found your profile through the Daystar expertise map. My proposed paper is in the area of ' + cluster + '.\n\n[Describe your paper and why this mentor is a good fit]\n\nKind regards,\n[Your name]\nDRICE Pilot Cohort 1 · Daystar University');
+    window.location.href = 'mailto:' + email + '?cc=drice@daystar.ac.ke&subject=' + subj + '&body=' + body;
+    closeContactModal();
+  };
+  document.getElementById('contactModal').classList.add('open');
+}
+
+function closeContactModal() {
+  document.getElementById('contactModal').classList.remove('open');
+}
+
+// Modal overlay click close hook
+document.addEventListener('DOMContentLoaded', () => {
+  const cm = document.getElementById('contactModal');
+  if (cm) {
+    cm.addEventListener('click', (e) => {
+      if (e.target === cm) closeContactModal();
+    });
+  }
 });

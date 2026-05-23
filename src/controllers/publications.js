@@ -291,6 +291,230 @@ async function reanalyzeSDGs(req, res) {
   }
 }
 
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+async function getFacultyList(req, res) {
+  try {
+    const publications = await dbAll('SELECT * FROM publications');
+    
+    const authorsMap = {};
+    publications.forEach(p => {
+      const authorList = (p.authors || '').split(/[;|]/).map(a => a.trim()).filter(a => a.length > 3);
+      authorList.forEach(a => {
+        if (!authorsMap[a]) {
+          authorsMap[a] = {
+            name: a,
+            publications: [],
+            school: p.school || ''
+          };
+        }
+        authorsMap[a].publications.push(p);
+        if (p.school) {
+          authorsMap[a].school = p.school;
+        }
+      });
+    });
+
+    const faculty = Object.entries(authorsMap)
+      .map(([name, data]) => {
+        const pubs = data.publications;
+        const years = pubs.map(p => p.year).filter(Boolean);
+        const sdgs = [...new Set(pubs.flatMap(p => p.sdgs ? p.sdgs.split('|').map(s => s.trim()).filter(Boolean) : []))];
+        const slug = slugify(name);
+        return {
+          name,
+          slug,
+          school: data.school || 'Other',
+          pubCount: pubs.length,
+          activeYears: years.length ? `${Math.min(...years)}–${Math.max(...years)}` : 'Unknown',
+          lastActive: years.length ? Math.max(...years) : 2024,
+          sdgs,
+          indexingCount: pubs.filter(p => p.indexing && p.indexing !== 'Verify').length
+        };
+      })
+      .filter(f => f.pubCount >= 2)
+      .sort((a, b) => b.pubCount - a.pubCount);
+
+    res.json(faculty);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+async function getFacultyProfile(req, res) {
+  const { slug } = req.params;
+  try {
+    const publications = await dbAll('SELECT * FROM publications');
+    
+    const authorsMap = {};
+    publications.forEach(p => {
+      const authorList = (p.authors || '').split(/[;|]/).map(a => a.trim()).filter(a => a.length > 3);
+      authorList.forEach(a => {
+        if (!authorsMap[a]) {
+          authorsMap[a] = [];
+        }
+        authorsMap[a].push(p);
+      });
+    });
+
+    let matchedAuthor = null;
+    let dbAuthorName = null;
+    
+    for (const author of Object.keys(authorsMap)) {
+      if (slugify(author) === slug) {
+        matchedAuthor = authorsMap[author];
+        dbAuthorName = author;
+        break;
+      }
+    }
+    
+    if (!matchedAuthor) {
+      const slugParts = slug.split('-');
+      for (const author of Object.keys(authorsMap)) {
+        const authorSlug = slugify(author);
+        if (slugParts.every(part => authorSlug.includes(part))) {
+          matchedAuthor = authorsMap[author];
+          dbAuthorName = author;
+          break;
+        }
+      }
+    }
+
+    if (!matchedAuthor) {
+      return res.status(404).json({ error: `Researcher not found for slug '${slug}'` });
+    }
+
+    const pubs = matchedAuthor.map(r => ({
+      ...r,
+      sdgs: r.sdgs ? r.sdgs.split('|').map(s => s.trim()).filter(Boolean) : []
+    })).sort((a, b) => b.year - a.year);
+
+    const years = pubs.map(p => p.year).filter(Boolean);
+    const activeYears = years.length ? `${Math.min(...years)}–${Math.max(...years)}` : 'Unknown';
+    const lastActive = years.length ? Math.max(...years) : 2024;
+    const activeSince = years.length ? Math.min(...years) : 2008;
+
+    const schoolCounts = {};
+    pubs.forEach(p => {
+      if (p.school) schoolCounts[p.school] = (schoolCounts[p.school] || 0) + 1;
+    });
+    let school = 'Other';
+    let maxSchoolCount = 0;
+    Object.entries(schoolCounts).forEach(([sc, count]) => {
+      if (count > maxSchoolCount) {
+        maxSchoolCount = count;
+        school = sc;
+      }
+    });
+
+    const textCorpus = pubs.map(p => `${p.title} ${p.abstract} ${p.publisher}`).join(' ').toLowerCase();
+    const clusters = new Set();
+    if (textCorpus.includes('health') || textCorpus.includes('clinic') || textCorpus.includes('patient') || textCorpus.includes('nurs') || textCorpus.includes('diseas')) {
+      clusters.add('Community health');
+    }
+    if (textCorpus.includes('media') || textCorpus.includes('journalism') || textCorpus.includes('communication') || textCorpus.includes('governance')) {
+      clusters.add('Media & governance');
+    }
+    if (textCorpus.includes('business') || textCorpus.includes('econ') || textCorpus.includes('financ') || textCorpus.includes('marketing')) {
+      clusters.add('Business & economics');
+    }
+    if (textCorpus.includes('computer') || textCorpus.includes('ai') || textCorpus.includes('technology') || textCorpus.includes('algorithm') || textCorpus.includes('digital')) {
+      clusters.add('AI & technology');
+    }
+    if (textCorpus.includes('education') || textCorpus.includes('school') || textCorpus.includes('learning') || textCorpus.includes('student')) {
+      clusters.add('Education & dev.');
+    }
+    if (clusters.size === 0) {
+      if (school === 'SSEH') clusters.add('Community health');
+      else if (school === 'SOC') clusters.add('Media & governance');
+      else if (school === 'SBE') clusters.add('Business & economics');
+      else clusters.add('Education & dev.');
+    }
+
+    const methodologies = new Set();
+    if (textCorpus.includes('model') || textCorpus.includes('statistical') || textCorpus.includes('quantitative') || textCorpus.includes('mathematical') || textCorpus.includes('regression') || textCorpus.includes('bayesian') || textCorpus.includes('data')) {
+      methodologies.add('Quantitative');
+    }
+    if (textCorpus.includes('bayesian') || textCorpus.includes('prior') || textCorpus.includes('posterior')) {
+      methodologies.add('Bayesian modelling');
+    }
+    if (textCorpus.includes('survey') || textCorpus.includes('questionnaire') || textCorpus.includes('interview') || textCorpus.includes('mixed')) {
+      methodologies.add('Mixed methods');
+    }
+    if (textCorpus.includes('qualitative') || textCorpus.includes('focus group') || textCorpus.includes('thematic')) {
+      methodologies.add('Qualitative');
+    }
+    if (textCorpus.includes('secondary data') || textCorpus.includes('kdhs') || textCorpus.includes('census') || textCorpus.includes('demographic')) {
+      methodologies.add('Secondary data');
+    }
+    if (methodologies.size === 0) {
+      methodologies.add('Mixed methods');
+    }
+
+    const sdgs = [...new Set(pubs.flatMap(p => p.sdgs))];
+
+    const grants = [];
+    if (pubs.length >= 5) {
+      grants.push('NRF eligible');
+    }
+    if (school === 'SSEH' || school === 'SOC' || school === 'SBE' || school === 'SON') {
+      grants.push('IDRC eligible');
+    }
+    if (grants.length === 0) {
+      grants.push('Check eligibility');
+    }
+
+    const collaborators = new Set();
+    pubs.forEach(p => {
+      const coAuthors = (p.authors || '').split(/[;|]/).map(a => a.trim()).filter(a => a.length > 3 && a !== dbAuthorName);
+      coAuthors.forEach(ca => collaborators.add(ca.split(',')[0]));
+      
+      const pubLower = p.publisher.toLowerCase();
+      if (pubLower.includes('nairobi') || pubLower.includes('uon')) collaborators.add('Univ. of Nairobi');
+      if (pubLower.includes('kemri')) collaborators.add('KEMRI');
+      if (pubLower.includes('health') || pubLower.includes('moh')) collaborators.add('MOH Kenya');
+    });
+
+    const collabList = [...collaborators].slice(0, 5);
+    if (collabList.length === 0) {
+      collabList.push('DRICE Network');
+    }
+
+    const trendYears = ['2020', '2021', '2022', '2023', '2024', '2025', '2026'];
+    const trendValues = trendYears.map(yr => pubs.filter(p => String(p.year) === yr).length);
+
+    res.json({
+      name: dbAuthorName,
+      slug,
+      school,
+      pubCount: pubs.length,
+      activeYears,
+      activeSince,
+      lastActive,
+      verifiedCount: pubs.filter(p => p.indexing && p.indexing !== 'Verify').length,
+      clusters: [...clusters],
+      methodologies: [...methodologies],
+      sdgs,
+      grants,
+      collaborators: collabList,
+      trend: {
+        years: trendYears,
+        values: trendValues,
+        rising: trendValues[trendValues.length - 1] >= trendValues[trendValues.length - 2] ? 'Rising' : 'Stable'
+      },
+      publications: pubs
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 module.exports = {
   getSchools,
   getPublications,
@@ -299,5 +523,7 @@ module.exports = {
   uploadCSV,
   harvest,
   aiInsight,
-  reanalyzeSDGs
+  reanalyzeSDGs,
+  getFacultyList,
+  getFacultyProfile
 };

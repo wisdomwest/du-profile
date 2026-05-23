@@ -113,7 +113,16 @@
     <button class="mnb" id="tab-sdg" onclick="goTo('sec-sdg', this)">SDGs Mapping</button>
     <button class="mnb" id="tab-schools" onclick="goTo('sec-schools', this)">School Profiles</button>
     <button class="mnb" id="tab-faculty" onclick="goTo('sec-faculty', this)">Faculty Cards</button>
+    <button class="mnb" id="tab-network" onclick="goTo('sec-network', this)">Collaboration Map <span class="new-tab" style="font-size:9px; background:rgba(200,169,81,0.2); color:#C8A951; padding:1px 4px; border-radius:3px; font-weight:600; margin-left:3px;">NEW</span></button>
+    <button class="mnb" id="tab-teambuilder" onclick="goTo('sec-teambuilder', this)">Team Builder <span class="new-tab" style="font-size:9px; background:rgba(200,169,81,0.2); color:#C8A951; padding:1px 4px; border-radius:3px; font-weight:600; margin-left:3px;">NEW</span></button>
   </nav>
+
+  <!-- SUB-ANCHOR BAR -->
+  <div class="page-anchor-bar" id="sub-anchor-bar">
+    <a class="anchor-link here" id="anchor-net" onclick="scrollSection('sec-network', this)">A — Collaboration network map</a>
+    <a class="anchor-link" id="anchor-profile" onclick="scrollSection('sec-faculty', this)">B — Individual researcher profile page</a>
+    <a class="anchor-link" id="anchor-team" onclick="scrollSection('sec-teambuilder', this)">C — Consortium team builder</a>
+  </div>
 
   <!-- CONTENT VIEWPORTS -->
   <main class="content" id="app-main-viewport">
@@ -259,6 +268,185 @@
       <div id="faculty-cards"></div>
     </section>
 
+    <!-- COLLABORATION NETWORK MAP SECTION -->
+    <section class="sec-block" id="sec-network">
+      <h3 class="sec-title">Co-authorship & Collaboration Network</h3>
+      <p class="sec-sub">Shows which Daystar researchers collaborate, which clusters are active, and ties to external institutions.</p>
+      
+      <div class="network-container">
+        <div class="network-toolbar">
+          <label for="net-cluster-filter">Filter by cluster</label>
+          <select class="net-select" id="net-cluster-filter" onchange="filterNetwork(this.value)">
+            <option value="all">All clusters</option>
+            <option value="SSEH">School of SSEH</option>
+            <option value="SOC">School of SOC</option>
+            <option value="SBE">School of SBE</option>
+            <option value="SHSS">School of SHSS</option>
+            <option value="SON">School of SON</option>
+            <option value="SOL">School of SOL</option>
+            <option value="SASS">School of SASS</option>
+            <option value="SMT">School of SMT</option>
+          </select>
+          
+          <label style="margin-left:8px;">Show</label>
+          <button class="net-toggle on" id="toggle-internal" onclick="this.classList.toggle('on'); drawNetwork();">Internal links</button>
+          <button class="net-toggle on" id="toggle-external" onclick="this.classList.toggle('on'); drawNetwork();">External links</button>
+          <button class="net-toggle" id="toggle-isolated" onclick="this.classList.toggle('on'); drawNetwork();">Isolated nodes</button>
+          <label style="margin-left:8px;" for="net-density-filter">Density</label>
+          <select class="net-select" id="net-density-filter" onchange="drawNetwork()">
+            <option value="high">All Faculty (>=2 papers)</option>
+            <option value="medium" selected>Key Active (>=3 papers)</option>
+            <option value="low">Core Leaders (>=5 papers)</option>
+          </select>
+          
+          <label style="margin-left:8px;" for="net-year-filter">Year range</label>
+          <select class="net-select" id="net-year-filter" onchange="drawNetwork()">
+            <option value="all">All years</option>
+            <option value="2023-2026">2023–2026</option>
+            <option value="2020-2026">2020–2026</option>
+            <option value="2015-2026">2015–2026</option>
+          </select>
+        </div>
+        <div class="network-body">
+          <div class="network-canvas" id="netCanvas">
+            <div class="net-tooltip" id="netTooltip">
+              <div class="tooltip-name" id="tt-name"></div>
+              <div class="tooltip-sub" id="tt-sub"></div>
+              <div id="tt-tags"></div>
+            </div>
+            <svg width="100%" height="600" id="networkSVG" style="display:block;"></svg>
+          </div>
+          <div class="net-legend">
+            <div>
+              <div class="legend-section"><h4>Node type</h4>
+                <div class="legend-item"><div class="legend-dot" style="background:#003366;width:16px;height:16px;"></div>Daystar faculty</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#888780;width:10px;height:10px;"></div>External institution</div>
+              </div>
+            </div>
+            <div>
+              <div class="legend-section"><h4>School Cluster color</h4>
+                <div class="legend-item"><div class="legend-dot" style="background:#25AAE1;"></div>SSEH</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div>SOC</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#EF9F27;"></div>SBE</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#E0606F;"></div>SHSS</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>SON</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#BA7517;"></div>SOL</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#64748B;"></div>SASS</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#639922;"></div>SMT</div>
+              </div>
+            </div>
+            <div>
+              <div class="legend-section"><h4>Co-authorships</h4>
+                <div class="legend-item"><div class="legend-line" style="background:#003366;height:3px;"></div>3+ co-authored papers</div>
+                <div class="legend-item"><div class="legend-line" style="background:#003366;height:1.5px;"></div>1–2 co-authored papers</div>
+                <div class="legend-item"><div class="legend-line" style="background:#888780;height:1px;opacity:0.4;"></div>External link</div>
+              </div>
+            </div>
+            <div class="net-stats-row">
+              <div class="net-stat"><div class="net-stat-val" id="stat-nodes">&mdash;</div><div class="net-stat-lbl">Researchers</div></div>
+              <div class="net-stat"><div class="net-stat-val" id="stat-edges">&mdash;</div><div class="net-stat-lbl">Connections</div></div>
+              <div class="net-stat"><div class="net-stat-val" id="stat-ext">&mdash;</div><div class="net-stat-lbl">External Inst.</div></div>
+              <div class="net-stat"><div class="net-stat-val" id="stat-isolated">&mdash;</div><div class="net-stat-lbl">Isolated</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONSORTIUM & TEAM BUILDER SECTION -->
+    <section class="sec-block" id="sec-teambuilder">
+      <h3 class="sec-title">Consortium & Grant Team Builder</h3>
+      <p class="sec-sub">Select target research clusters and shared SDGs to dynamically assemble and rank the optimal multi-disciplinary research team.</p>
+      
+      <div class="team-builder">
+        <div class="tb-header">
+          <div>
+            <div class="tb-title">Build a research team</div>
+            <div class="tb-sub">Select clusters and shared SDGs — system suggests the best-matched researchers from across Daystar</div>
+          </div>
+          <span class="badge" style="background:rgba(200,169,81,0.2);color:var(--gold);font-size:12px;padding:4px 10px;">P3 — Consortium building tool</span>
+        </div>
+        <div class="tb-body">
+          <div class="tb-config">
+            <div class="config-section">
+              <div class="config-label">Select research clusters (2–4)</div>
+              <div class="cluster-picker" id="tb-cluster-picker">
+                <div class="cluster-option selected" data-cluster="SSEH" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SSEH (Science & Health)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option selected" data-cluster="SOC" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SOC (Communication)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option selected" data-cluster="SBE" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SBE (Business & Econ)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option" data-cluster="SHSS" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SHSS (Human Sciences)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option" data-cluster="SON" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SON (Nursing)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option" data-cluster="SOL" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SOL (Law)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option" data-cluster="SASS" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SASS (Arts & Social Sciences)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="cluster-option" data-cluster="SMT" onclick="this.classList.toggle('selected'); generateTeam();">
+                  <span>School of SMT (Theology & Mission)</span>
+                  <div class="check"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="config-section">
+              <div class="config-label">Shared SDG focus (optional)</div>
+              <div class="sdg-picker" id="tb-sdg-picker">
+                <button class="sdg-btn on" data-sdg="SDG 3" onclick="this.classList.toggle('on'); generateTeam();">SDG 3 Health</button>
+                <button class="sdg-btn on" data-sdg="SDG 4" onclick="this.classList.toggle('on'); generateTeam();">SDG 4 Education</button>
+                <button class="sdg-btn" data-sdg="SDG 5" onclick="this.classList.toggle('on'); generateTeam();">SDG 5 Gender</button>
+                <button class="sdg-btn" data-sdg="SDG 8" onclick="this.classList.toggle('on'); generateTeam();">SDG 8 Work</button>
+                <button class="sdg-btn" data-sdg="SDG 9" onclick="this.classList.toggle('on'); generateTeam();">SDG 9 Innovation</button>
+                <button class="sdg-btn" data-sdg="SDG 13" onclick="this.classList.toggle('on'); generateTeam();">SDG 13 Climate</button>
+                <button class="sdg-btn" data-sdg="SDG 16" onclick="this.classList.toggle('on'); generateTeam();">SDG 16 Governance</button>
+              </div>
+            </div>
+            
+            <div class="config-section">
+              <div class="config-label">Additional filters</div>
+              <div style="display:flex;flex-direction:column;gap:7px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-sec);cursor:pointer;">
+                  <input type="checkbox" id="tb-filter-grant" checked onchange="generateTeam()" style="accent-color:var(--navy);"> Grant-eligible researchers only
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-sec);cursor:pointer;">
+                  <input type="checkbox" id="tb-filter-active" checked onchange="generateTeam()" style="accent-color:var(--navy);"> Active in last 3 years
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-sec);cursor:pointer;">
+                  <input type="checkbox" id="tb-filter-external" onchange="generateTeam()" style="accent-color:var(--navy);"> Has external collaborator
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-sec);cursor:pointer;">
+                  <input type="checkbox" id="tb-filter-oneschool" onchange="generateTeam()" style="accent-color:var(--navy);"> One researcher per school
+                </label>
+              </div>
+            </div>
+            
+            <button class="generate-btn" onclick="generateTeam()">Generate suggested team &rarr;</button>
+          </div>
+          
+          <div class="tb-results" id="team-results-container">
+            <!-- Dynamically generated outputs will go here -->
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- UPLOAD CSV DIALOG MODAL -->
@@ -280,6 +468,37 @@
       </div>
     </div>
   </dialog>
+
+  <!-- CONTACT MODAL -->
+  <div class="modal-overlay" id="contactModal">
+    <div class="modal-box">
+      <div class="modal-hdr">
+        <span class="modal-title" style="color:white;">Contact researcher — pre-filled email</span>
+        <button class="modal-close" onclick="closeContactModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="email-preview">
+          <div class="ep-header">
+            <div class="ep-field"><span class="ep-lbl">To</span><span id="m-to">&mdash;</span></div>
+            <div class="ep-field"><span class="ep-lbl">CC</span><span style="color:#1D9E75;">drice@daystar.ac.ke <span style="font-size:10px;background:#E1F5EE;color:#085041;padding:1px 5px;border-radius:3px;">Always included</span></span></div>
+            <div class="ep-field"><span class="ep-lbl">Subject</span><span style="font-weight:500;">DRICE Fellowship — Mentorship enquiry from [Your name]</span></div>
+          </div>
+          <div class="ep-body">
+            <p>Dear Dr. <span id="m-surname">Simwa</span>,</p><br>
+            <p>I am a DRICE Research Fellow (Pilot Cohort 1, May Semester 2026) and found your profile through the Daystar expertise map. My proposed paper is in the area of <strong id="m-cluster">Community health</strong> and I am particularly interested in your work in this area.</p>
+            <div class="ep-placeholder">Describe your paper and why this mentor is a good fit — 2–3 sentences...</div>
+            <p>I would welcome a brief conversation to explore whether a mentorship arrangement might be possible this semester.</p><br>
+            <p>Kind regards,<br><strong>[Your name]</strong><br>DRICE Pilot Cohort 1 · Daystar University</p>
+          </div>
+          <div class="ep-footer">
+            <span style="font-size:11px;color:var(--text-muted);align-self:center;">Opens your email client</span>
+            <button class="btn-cancel" onclick="closeContactModal()">Cancel</button>
+            <button class="btn-send" id="m-send">Open in mail &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- FOOTER -->
   <footer class="footer" id="app-footer">

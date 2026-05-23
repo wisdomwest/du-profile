@@ -18,6 +18,11 @@ app.use(express.static(path.join(__dirname, 'src/public')));
 // Mount API routes
 app.use('/api', apiRouter);
 
+// Serve faculty.html for individual profiles
+app.get('/faculty/:slug', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src/public', 'faculty.html'));
+});
+
 // Serve index.html for root path
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'src/public', 'index.html'));

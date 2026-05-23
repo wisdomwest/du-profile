@@ -14,6 +14,8 @@ router.get('/schools', publicationsController.getSchools);
 router.get('/publications', publicationsController.getPublications);
 router.get('/stats', publicationsController.getStats);
 router.get('/export-csv', publicationsController.exportCSV);
+router.get('/faculty', publicationsController.getFacultyList);
+router.get('/faculty/:slug', publicationsController.getFacultyProfile);
 
 router.post('/upload-csv', upload.single('file'), publicationsController.uploadCSV);
 router.post('/harvest', publicationsController.harvest);

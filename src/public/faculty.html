@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Researcher Profile — Daystar University DU-Space</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- TOPBAR HEADER -->
+  <header class="topbar" id="app-header">
+    <div class="tb-left">
+      <h1 class="tb-title" style="cursor: pointer;" onclick="window.location.href='/'">Daystar University — DU-Space Research Profile</h1>
+      <div class="tb-sub">
+        DRICE &bull; Public Research Identity Page &bull; <span id="profile-status">Loading researcher details...</span>
+      </div>
+    </div>
+    <div class="tb-right">
+      <button class="btn-import btn-primary-theme" onclick="window.location.href='/'">
+        &larr; Back to Dashboard
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="content">
+    <div id="error-container" style="display: none; text-align: center; padding: 48px; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);">
+      <h2 style="color: var(--secondary); margin-bottom: 12px; font-size: 24px;">Researcher Profile Not Found</h2>
+      <p style="color: var(--text-muted); margin-bottom: 24px; font-size: 14px;">The requested academic profile could not be retrieved from the database. It might have been deleted, or the URL slug is misspelled.</p>
+      <button class="btn-import btn-primary-theme" onclick="window.location.href='/'">Return to Dashboard</button>
+    </div>
+
+    <div class="profile-page-wrap" id="profile-container" style="display: none;">
+      <!-- URL Bar -->
+      <div class="profile-url-bar">
+        <span class="url-label">Public URL:</span>
+        <span class="url-text" id="public-url-text">du-profile.onrender.com/faculty/...</span>
+        <button class="url-copy" id="url-copy-btn">Copy link</button>
+        <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">Publicly accessible &bull; Indexed by search engines &bull; Links from ORCID profile</span>
+      </div>
+
+      <!-- Hero Header -->
+      <div class="prof-hero">
+        <div class="prof-hero-inner">
+          <div class="prof-avatar" id="hero-avatar" style="background: var(--primary);">SR</div>
+          <div class="prof-identity">
+            <h2 class="prof-name" id="hero-name">Researcher Name</h2>
+            <div class="prof-rank" id="hero-rank">Associate Professor &bull; School &bull; Daystar University</div>
+            <div class="prof-badges" id="hero-badges">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="prof-links" id="hero-links">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="prof-meta-row">
+              <span class="active-pill" id="hero-status-pill">Active researcher</span>
+              <span class="last-active-txt" id="hero-active-range">Last publication: 2025 &bull; Active since 2008</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Strip -->
+      <div class="stat-strip">
+        <div class="stat-cell">
+          <div class="stat-val" id="stat-pubs-count">0</div>
+          <div class="stat-lbl">Publications</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val" id="stat-journal-count">0</div>
+          <div class="stat-lbl">Journal articles</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val" id="stat-years-range" style="font-size: 15px;">&mdash;</div>
+          <div class="stat-lbl">Active years</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val" id="stat-indexed-count" style="color: var(--primary);">0</div>
+          <div class="stat-lbl">Verified indexed</div>
+        </div>
+      </div>
+
+      <!-- Main Layout Grid -->
+      <div class="prof-body">
+        <!-- Sidebar -->
+        <aside class="prof-sidebar">
+          <div class="sidebar-section">
+            <h4>Research clusters</h4>
+            <div class="tag-row" id="sidebar-clusters">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4>Methodology</h4>
+            <div class="tag-row" id="sidebar-methodologies">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4>SDG Alignment</h4>
+            <div class="tag-row" id="sidebar-sdgs">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4>Grants & Funding</h4>
+            <div class="tag-row" id="sidebar-grants" style="margin-bottom: 6px;">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4>Collaboration Links</h4>
+            <div class="tag-row" id="sidebar-collaborators">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4>Publication Trend</h4>
+            <div class="trend-wrap" id="sidebar-trend-bars">
+              <!-- Sparkline bars dynamically populated -->
+            </div>
+            <div class="trend-meta">
+              <span id="trend-years-label">2020–2026</span>
+              <span class="trend-up" id="trend-direction-label" style="color: var(--primary);">Stable</span>
+            </div>
+          </div>
+
+          <div class="prof-contact-sidebar">
+            <div class="contact-lbl">Contact this researcher</div>
+            <button class="contact-btn-p" id="btn-request-mentorship">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1.5"/><path d="M2 5l6 5 6-5"/></svg>
+              Request mentorship
+            </button>
+            <button class="contact-btn-s" id="btn-propose-collab">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="3"/><circle cx="11" cy="11" r="3"/><path d="M8.5 7.5l1 2"/></svg>
+              Propose collaboration
+            </button>
+            <button class="contact-btn-s" id="btn-industry-partnership">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 7h6M5 10h4"/></svg>
+              Industry partnership
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <section class="prof-main">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .09em; margin-bottom: 14px;" id="list-header-count">
+            Full publication list (0 records)
+          </div>
+          <div class="pub-full-list" id="pub-list-container">
+            <!-- Dynamically populated list of publications -->
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- CONTACT EMAIL MODAL -->
+  <div class="modal-overlay" id="contactModal">
+    <div class="modal-box">
+      <div class="modal-hdr">
+        <span class="modal-title">Contact researcher — pre-filled email</span>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="email-preview">
+          <div class="ep-header">
+            <div class="ep-field"><span class="ep-lbl">To</span><span id="m-to">email@daystar.ac.ke</span></div>
+            <div class="ep-field"><span class="ep-lbl">CC</span><span style="color: var(--primary);">drice@daystar.ac.ke <span style="font-size: 10px; background: var(--primary-light); color: var(--primary-hover); padding: 1px 5px; border-radius: 3px;">Always included</span></span></div>
+            <div class="ep-field"><span class="ep-lbl">Subject</span><span style="font-weight: 500;" id="m-subject">DRICE Fellowship — Mentorship enquiry</span></div>
+          </div>
+          <div class="ep-body">
+            <p>Dear Dr. <span id="m-surname">Researcher</span>,</p><br>
+            <p>I am a DRICE Research Fellow (Pilot Cohort 1, May Semester 2026) and found your profile through the Daystar expertise map. My proposed paper is in the area of <strong id="m-cluster">Research Cluster</strong> and I am particularly interested in your work in this area.</p>
+            <div class="ep-placeholder">Describe your paper and why this mentor is a good fit — 2–3 sentences...</div>
+            <p>I would welcome a brief conversation to explore whether a mentorship arrangement might be possible this semester.</p><br>
+            <p>Kind regards,<br><strong>[Your name]</strong><br>DRICE Pilot Cohort 1 &bull; Daystar University</p>
+          </div>
+          <div class="ep-footer">
+            <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Opens your email client</span>
+            <button class="btn-cancel" id="m-cancel-btn">Cancel</button>
+            <button class="btn-send" id="m-send-btn">Open in mail &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer" id="app-footer">
+    <div class="footer-title">Daystar University Research Repository Profile</div>
+    <div class="footer-sub">Data harvested from repository.daystar.ac.ke &bull; Maintained by DRICE &bull; May 2026</div>
+    <div class="footer-links">
+      <a href="https://repository.daystar.ac.ke" target="_blank">DU-Space Repository</a>
+      <a href="https://drice.daystar.ac.ke" target="_blank">DRICE Platform</a>
+      <a href="https://daystar.ac.ke" target="_blank">Daystar University Website</a>
+    </div>
+  </footer>
+
+  <script>
+    // Copy link helper
+    const copyBtn = document.getElementById('url-copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const textToCopy = window.location.host + window.location.pathname;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy link';
+          }, 1500);
+        });
+      });
+    }
+
+    // Modal helpers
+    const contactModal = document.getElementById('contactModal');
+    function closeContactModal() {
+      contactModal.classList.remove('open');
+    }
+    document.getElementById('modal-close-btn').addEventListener('click', closeContactModal);
+    document.getElementById('m-cancel-btn').addEventListener('click', closeContactModal);
+    contactModal.addEventListener('click', (e) => {
+      if (e.target === contactModal) closeContactModal();
+    });
+
+    function openEmailModal(name, email, cluster, type) {
+      const surname = name.includes(',') ? name.split(',')[0].trim() : name.split(' ').pop();
+      document.getElementById('m-to').textContent = email || `${name.toLowerCase().replace(/[^a-z]/g, '')}@daystar.ac.ke`;
+      document.getElementById('m-surname').textContent = surname;
+      document.getElementById('m-cluster').textContent = cluster || 'your research field';
+      
+      let subjectStr = '';
+      let bodyTemplate = '';
+
+      if (type === 'mentorship') {
+        subjectStr = `DRICE Fellowship — Mentorship enquiry from [Your name]`;
+        bodyTemplate = `Dear Dr. ${surname},\n\nI am a DRICE Research Fellow (Pilot Cohort 1, May Semester 2026) and found your profile through the Daystar expertise map. My proposed paper is in the area of ${cluster || 'your research field'}.\n\n[Describe your paper and why this mentor is a good fit]\n\nKind regards,\n[Your name]\nDRICE Pilot Cohort 1 · Daystar University`;
+      } else if (type === 'collaboration') {
+        subjectStr = `Research Collaboration Proposal — [Your name]`;
+        bodyTemplate = `Dear Dr. ${surname},\n\nI hope this email finds you well. I am a researcher at Daystar University, and I was reviewing your publications profile on DU-Space in the area of ${cluster || 'your research field'}.\n\nI would love to explore a potential research collaboration regarding [insert topic].\n\nKind regards,\n[Your name]\nDaystar University`;
+      } else {
+        subjectStr = `Industry Partnership Enquiry — [Your name]`;
+        bodyTemplate = `Dear Dr. ${surname},\n\nI am contacting you regarding your research on DU-Space. We are interested in exploring potential industry partnerships or consulting projects based on your work.\n\nKind regards,\n[Your name]\n[Your Organization]`;
+      }
+
+      document.getElementById('m-subject').textContent = subjectStr;
+      
+      document.getElementById('m-send-btn').onclick = () => {
+        const mailtoLink = `mailto:${document.getElementById('m-to').textContent}?cc=drice@daystar.ac.ke&subject=${encodeURIComponent(subjectStr)}&body=${encodeURIComponent(bodyTemplate)}`;
+        window.location.href = mailtoLink;
+        closeContactModal();
+      };
+
+      contactModal.classList.add('open');
+    }
+
+    // Dynamic fetch from URL slug
+    document.addEventListener('DOMContentLoaded', () => {
+      const pathParts = window.location.pathname.split('/');
+      const slug = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+      
+      document.getElementById('public-url-text').textContent = window.location.host + window.location.pathname;
+
+      if (!slug) {
+        document.getElementById('profile-status').textContent = 'Error';
+        document.getElementById('error-container').style.display = 'block';
+        return;
+      }
+
+      fetch(`/api/faculty/${slug}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Researcher not found');
+          return res.json();
+        })
+        .then(data => {
+          document.getElementById('profile-status').textContent = data.name;
+          document.getElementById('profile-container').style.display = 'block';
+          
+          // Populate Hero
+          document.getElementById('hero-name').textContent = data.name;
+          const initials = data.name.includes(',') 
+            ? data.name.split(',')[0][0] + (data.name.split(',')[1]?.trim()[0] || '')
+            : data.name.split(' ').map(n => n[0]).join('').substring(0, 2);
+          
+          const avatar = document.getElementById('hero-avatar');
+          avatar.textContent = initials.toUpperCase();
+          
+          const colors = { SSEH: '#25AAE1', SOC: '#1D9E75', SBE: '#EF9F27', SHSS: '#E0606F', SON: '#7C3AED', SOL: '#BA7517', SASS: '#64748B', SMT: '#639922' };
+          avatar.style.backgroundColor = colors[data.school] || 'var(--primary)';
+
+          document.getElementById('hero-rank').textContent = `${data.pubCount >= 10 ? 'Senior Researcher' : 'Faculty Member'} &bull; School of ${data.school} &bull; Daystar University`;
+          
+          // Badges
+          const badgeContainer = document.getElementById('hero-badges');
+          badgeContainer.innerHTML = `
+            <span class="badge bg" style="font-size: 11px;">${data.school}</span>
+            <span class="badge bp" style="font-size: 11px;">${data.pubCount} Publications</span>
+            <span class="badge b-new" style="background: var(--secondary); color: white;">DRICE Profile</span>
+          `;
+
+          // Links
+          const linksContainer = document.getElementById('hero-links');
+          const safeEmail = data.name.toLowerCase().replace(/[^a-z]/g, '') + '@daystar.ac.ke';
+          linksContainer.innerHTML = `
+            <a class="prof-link" href="https://orcid.org" target="_blank">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M6 8h4M8 6v4"/></svg>
+              ORCID Verified
+            </a>
+            <a class="prof-link" href="https://scholar.google.com" target="_blank">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3H13V6M13 3L7 9M6 4H3V13H12V10"/></svg>
+              Google Scholar
+            </a>
+            <a class="prof-link" href="mailto:${safeEmail}">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1.5"/><path d="M2 5l6 5 6-5"/></svg>
+              ${safeEmail}
+            </a>
+          `;
+
+          document.getElementById('hero-active-range').innerHTML = `Last publication: ${data.lastActive} &bull; Active since ${data.activeSince}`;
+
+          // Stats
+          document.getElementById('stat-pubs-count').textContent = data.pubCount;
+          document.getElementById('stat-journal-count').textContent = data.publications.filter(p => p.type === 'Journal Article').length;
+          document.getElementById('stat-years-range').textContent = data.activeYears;
+          document.getElementById('stat-indexed-count').textContent = data.verifiedCount;
+
+          // Sidebar Sections
+          const clustersDiv = document.getElementById('sidebar-clusters');
+          clustersDiv.innerHTML = data.clusters.map(c => `<span class="badge b-cluster">${c}</span>`).join('');
+
+          const methodsDiv = document.getElementById('sidebar-methodologies');
+          methodsDiv.innerHTML = data.methodologies.map(m => `<span class="badge b-method">${m}</span>`).join('');
+
+          const sdgsDiv = document.getElementById('sidebar-sdgs');
+          sdgsDiv.innerHTML = data.sdgs.map(s => `<span class="badge b-sdg">${s}</span>`).join('');
+
+          const grantsDiv = document.getElementById('sidebar-grants');
+          grantsDiv.innerHTML = data.grants.map(g => `<span class="badge b-grant">${g}</span>`).join('');
+
+          const collabsDiv = document.getElementById('sidebar-collaborators');
+          collabsDiv.innerHTML = data.collaborators.map(c => `<span class="badge b-collab">${c}</span>`).join('');
+
+          // Trend
+          const trendBars = document.getElementById('sidebar-trend-bars');
+          trendBars.innerHTML = '';
+          const maxVal = Math.max(1, ...data.trend.values);
+          data.trend.values.forEach((val, i) => {
+            const pct = Math.max(10, Math.round((val / maxVal) * 100));
+            const bar = document.createElement('div');
+            bar.className = `tc ${i === data.trend.values.length - 1 ? 'r' : ''}`;
+            bar.style.height = `${pct}%`;
+            bar.title = `${data.trend.years[i]}: ${val} pubs`;
+            trendBars.appendChild(bar);
+          });
+          document.getElementById('trend-years-label').textContent = `${data.trend.years[0]}–${data.trend.years[data.trend.years.length - 1]}`;
+          document.getElementById('trend-direction-label').textContent = `${data.trend.rising} ↑`;
+          if (data.trend.rising === 'Rising') {
+            document.getElementById('trend-direction-label').style.color = 'var(--success-text)';
+          }
+
+          // Contact actions
+          const primaryCluster = data.clusters[0] || 'Community health';
+          document.getElementById('btn-request-mentorship').onclick = () => {
+            openEmailModal(data.name, safeEmail, primaryCluster, 'mentorship');
+          };
+          document.getElementById('btn-propose-collab').onclick = () => {
+            openEmailModal(data.name, safeEmail, primaryCluster, 'collaboration');
+          };
+          document.getElementById('btn-industry-partnership').onclick = () => {
+            openEmailModal(data.name, safeEmail, primaryCluster, 'industry');
+          };
+
+          // Publication List
+          document.getElementById('list-header-count').textContent = `Full publication list (${data.pubCount} records)`;
+          const pubList = document.getElementById('pub-list-container');
+          pubList.innerHTML = '';
+          data.publications.forEach(p => {
+            const row = document.createElement('div');
+            row.className = 'pub-row';
+            
+            const listSDGs = Array.isArray(p.sdgs) ? p.sdgs : [];
+            const isVerified = p.indexing && p.indexing !== 'Verify';
+
+            row.innerHTML = `
+              <div class="pub-year-col">${p.year || '&mdash;'}</div>
+              <div class="pub-content">
+                <a class="pub-title-full" href="${p.url}" target="_blank" style="text-decoration:none; display:block; margin-bottom:5px;">${p.title}</a>
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">${p.authors}</div>
+                <div class="pub-meta">
+                  <span class="pub-type-badge">${p.type || 'Research Output'}</span>
+                  <span class="pub-venue-txt">${p.publisher || ''}</span>
+                  ${listSDGs.map(s => `<span class="badge b-sdg" style="padding:1px 6px; font-size:9px;">${s}</span>`).join('')}
+                  <span class="pub-verified ${isVerified ? 'ok' : 'pend'}" style="margin-left:auto;">
+                    ${isVerified ? '✓ Verified Indexed' : 'Verify &rarr;'}
+                  </span>
+                </div>
+              </div>
+            `;
+            
+            if (!isVerified) {
+              row.querySelector('.pub-verified').onclick = () => {
+                window.open(p.url || 'https://repository.daystar.ac.ke', '_blank');
+              };
+            }
+
+            pubList.appendChild(row);
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          document.getElementById('profile-status').textContent = 'Error';
+          document.getElementById('error-container').style.display = 'block';
+        });
+    });
+  </script>
+</body>
+</html>
