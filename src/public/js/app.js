@@ -356,6 +356,17 @@ function buildFaculty() {
   activeFaculty.forEach(([author, list]) => {
     const school = list[0].school || '';
     const initials = author.split(' ').map(w => w[0] || '').join('').substring(0, 2).toUpperCase();
+    
+    // Calculate 6-year publication trend (2021–2026) for the sparkline on the card
+    const years = ['2021', '2022', '2023', '2024', '2025', '2026'];
+    const counts = years.map(y => list.filter(p => String(p.year) === y).length);
+    const maxVal = Math.max(1, ...counts);
+    const sparklineHtml = counts.map((val, i) => {
+      const pct = Math.max(10, Math.round((val / maxVal) * 100));
+      const isLast = i === counts.length - 1;
+      return `<div class="tc ${isLast ? 'r' : ''}" style="height:${pct}%; min-width:6px;" title="${years[i]}: ${val} pubs"></div>`;
+    }).join('');
+
     const card = document.createElement('div');
     card.className = 'fp-card';
     card.innerHTML = `
@@ -378,6 +389,18 @@ function buildFaculty() {
           <div class="fp-met"><div class="fp-met-v">${list.filter(p => p.type === 'Conference Paper').length}</div><div class="fp-met-l">Conferences</div></div>
           <div class="fp-met"><div class="fp-met-v">${[...new Set(list.map(p => p.year))].length}</div><div class="fp-met-l">Active Years</div></div>
         </div>
+        
+        <!-- Premium Publication Trend Sparkline Block -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; margin-bottom:14px; padding:10px 14px; background:var(--bg-app); border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">6-Year Publication Trend</div>
+            <div style="font-size:11px; color:var(--text-main); font-weight:500;">2021–2026 &bull; <span style="color:var(--teal); font-weight:600;">Active</span></div>
+          </div>
+          <div class="trend-wrap" style="height:28px; gap:2px; margin-bottom:0; width:60px; justify-content:flex-end;">
+            ${sparklineHtml}
+          </div>
+        </div>
+
         <div style="font-size:11px; font-weight:600; color:var(--text-main); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px">Publication highlights</div>
         ${list.slice(0, 4).map(p => `
           <div class="fp-pub">
