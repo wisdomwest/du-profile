@@ -6,10 +6,10 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Premium Navy/Gold Mockup Branding */
-  --navy: #003366; 
-  --navy-mid: #0a2e5c; 
-  --navy-light: #1a3f6f;
+  /* Daystar Blue Branding Identity */
+  --navy: #02AEEE; 
+  --navy-mid: #018bc4; 
+  --navy-light: #33beff;
   --gold: #C8A951; 
   --gold-light: #e8c96a;
   --teal: #1D9E75; 
@@ -51,7 +51,7 @@
   /* Daystar Core Branding Colors (Mapped to Navy/Gold for seamless migration) */
   --primary: var(--navy);          /* Daystar Navy */
   --primary-hover: var(--navy-light);
-  --primary-light: rgba(0, 51, 102, 0.08);
+  --primary-light: rgba(2, 174, 238, 0.08);
   
   --secondary: var(--gold);        /* Daystar Gold */
   --secondary-hover: var(--gold-light);
@@ -2243,5 +2243,10 @@ table.dataTable tbody tr:hover td {
   background: var(--navy);
   color: var(--gold);
   border-color: var(--navy);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 

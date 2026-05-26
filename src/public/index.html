@@ -113,8 +113,8 @@
     <button class="mnb" id="tab-sdg" onclick="goTo('sec-sdg', this)">SDGs Mapping</button>
     <button class="mnb" id="tab-schools" onclick="goTo('sec-schools', this)">School Profiles</button>
     <button class="mnb" id="tab-faculty" onclick="goTo('sec-faculty', this)">Faculty Cards</button>
-    <button class="mnb" id="tab-network" onclick="goTo('sec-network', this)">Collaboration Map <span class="new-tab" style="font-size:9px; background:rgba(200,169,81,0.2); color:#C8A951; padding:1px 4px; border-radius:3px; font-weight:600; margin-left:3px;">NEW</span></button>
-    <button class="mnb" id="tab-teambuilder" onclick="goTo('sec-teambuilder', this)">Team Builder <span class="new-tab" style="font-size:9px; background:rgba(200,169,81,0.2); color:#C8A951; padding:1px 4px; border-radius:3px; font-weight:600; margin-left:3px;">NEW</span></button>
+    <button class="mnb" id="tab-network" onclick="goTo('sec-network', this)">Collaboration Map</button>
+    <button class="mnb" id="tab-teambuilder" onclick="goTo('sec-teambuilder', this)">Team Builder</button>
   </nav>
 
   <!-- SUB-ANCHOR BAR -->
@@ -155,7 +155,10 @@
               <option value="Book Chapter">Book chapters</option>
             </select>
           </div>
-          <h4 style="font-size:13px; font-weight:600; color:var(--neutral-dark); margin-bottom:12px">Publications by School</h4>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h4 style="font-size:13px; font-weight:600; color:var(--neutral-dark); margin:0;">Publications by School</h4>
+            <button class="btn-import btn-secondary-theme" style="padding:4px 8px; font-size:10px; cursor:pointer;" onclick="exportChartImage(sChart, 'publications_by_school.png')">&dArr; Export Chart</button>
+          </div>
           <div style="position:relative; height:220px">
             <canvas id="schoolChart" role="img" aria-label="Horizontal bar chart showing publications count per school"></canvas>
           </div>
@@ -168,7 +171,10 @@
             <span class="lgi"><span class="lgsq" style="background:#7C3AED"></span>Conference papers</span>
             <span class="lgi"><span class="lgsq" style="background:#E0606F"></span>Book chapters</span>
           </div>
-          <h4 style="font-size:13px; font-weight:600; color:var(--neutral-dark); margin-bottom:12px">Publication Trend (Recent Years)</h4>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h4 style="font-size:13px; font-weight:600; color:var(--neutral-dark); margin:0;">Publication Trend (Recent Years)</h4>
+            <button class="btn-import btn-secondary-theme" style="padding:4px 8px; font-size:10px; cursor:pointer;" onclick="exportChartImage(tChart, 'publications_trend.png')">&dArr; Export Chart</button>
+          </div>
           <div style="position:relative; height:220px">
             <canvas id="trendChart" role="img" aria-label="Stacked bar chart illustrating publication trends over recent years"></canvas>
           </div>
@@ -178,8 +184,13 @@
 
     <!-- BROWSE ALL PUBLICATIONS SECTION -->
     <section class="sec-block" id="sec-pubs">
-      <h3 class="sec-title">Browse All Publications</h3>
-      <p class="sec-sub">Searchable database indices of all harvested and imported research records.</p>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:6px;">
+        <h3 class="sec-title" style="margin:0;">Browse All Publications</h3>
+        <button class="btn-import btn-secondary-theme" id="clear-table-filters" onclick="clearAllFilters()" style="display:none; padding:6px 12px; font-size:11px; color:var(--text-sec); border-color:var(--border-color); cursor:pointer;">
+          ✕ Clear Filters (Show All)
+        </button>
+      </div>
+      <p class="sec-sub" style="margin-bottom:20px;">Searchable database indices of all harvested and imported research records.</p>
       
       <div class="card" id="publications-table-card">
         <table id="pubTable" class="display" style="width:100%">
@@ -301,11 +312,12 @@
           
           <label style="margin-left:8px;" for="net-year-filter">Year range</label>
           <select class="net-select" id="net-year-filter" onchange="drawNetwork()">
-            <option value="all">All years</option>
-            <option value="2023-2026">2023–2026</option>
+            <option value="2023-2026" selected>2023–2026 (Last 3 years)</option>
             <option value="2020-2026">2020–2026</option>
             <option value="2015-2026">2015–2026</option>
+            <option value="all">All years</option>
           </select>
+          <button class="btn-import btn-primary-theme" id="export-network-btn" onclick="exportNetworkSVG()" style="margin-left:auto; padding:6px 12px; font-size:11px; font-weight:600; cursor:pointer;">&dArr; Export Map</button>
         </div>
         <div class="network-body">
           <div class="network-canvas" id="netCanvas">
@@ -319,7 +331,7 @@
           <div class="net-legend">
             <div>
               <div class="legend-section"><h4>Node type</h4>
-                <div class="legend-item"><div class="legend-dot" style="background:#003366;width:16px;height:16px;"></div>Daystar faculty</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#02AEEE;width:16px;height:16px;"></div>Daystar faculty</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#888780;width:10px;height:10px;"></div>External institution</div>
               </div>
             </div>
@@ -337,8 +349,8 @@
             </div>
             <div>
               <div class="legend-section"><h4>Co-authorships</h4>
-                <div class="legend-item"><div class="legend-line" style="background:#003366;height:3px;"></div>3+ co-authored papers</div>
-                <div class="legend-item"><div class="legend-line" style="background:#003366;height:1.5px;"></div>1–2 co-authored papers</div>
+                <div class="legend-item"><div class="legend-line" style="background:#02AEEE;height:3px;"></div>3+ co-authored papers</div>
+                <div class="legend-item"><div class="legend-line" style="background:#02AEEE;height:1.5px;"></div>1–2 co-authored papers</div>
                 <div class="legend-item"><div class="legend-line" style="background:#888780;height:1px;opacity:0.4;"></div>External link</div>
               </div>
             </div>

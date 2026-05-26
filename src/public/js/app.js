@@ -68,14 +68,29 @@ const SC_TC = {
   SON: "#6D28D9", SOL: "#C2410C", SASS: "#475569", SMT: "#047857"
 };
 
+function normalizeSchoolCode(school) {
+  if (!school) return '';
+  const s = school.trim().toLowerCase();
+  if (s.includes('science') || s.includes('sseh')) return 'SSEH';
+  if (s.includes('communication') || s.includes('soc')) return 'SOC';
+  if (s.includes('business') || s.includes('economics') || s.includes('sbe')) return 'SBE';
+  if (s.includes('human') || s.includes('shss')) return 'SHSS';
+  if (s.includes('nursing') || s.includes('son')) return 'SON';
+  if (s.includes('law') || s.includes('sol')) return 'SOL';
+  if (s.includes('arts') || s.includes('sass')) return 'SASS';
+  if (s.includes('theology') || s.includes('mission') || s.includes('smt')) return 'SMT';
+  return school.toUpperCase(); // fallback
+}
+
 /**
  * Returns formatted school badge component.
  */
 function sb(schoolCode) {
-  if (!schoolCode) return '<span class="badge bgr">&mdash;</span>';
-  const bg = SC_BG[schoolCode] || '#F1F5F9';
-  const tc = SC_TC[schoolCode] || '#475569';
-  return `<span class="badge" style="background:${bg}; color:${tc}; border-color:rgba(0,0,0,0.05)">${schoolCode}</span>`;
+  const code = normalizeSchoolCode(schoolCode);
+  if (!code) return '<span class="badge bgr">&mdash;</span>';
+  const bg = SC_BG[code] || '#F1F5F9';
+  const tc = SC_TC[code] || '#475569';
+  return `<span class="badge" style="background:${bg}; color:${tc}; border-color:rgba(0,0,0,0.05)">${code}</span>`;
 }
 
 /* ==========================================================================
@@ -106,6 +121,32 @@ function buildCharts() {
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: 'y',
+        onClick: (event, elements) => {
+          if (elements && elements.length > 0) {
+            const index = elements[0].index;
+            const schoolCode = SCHOOLS[index].code;
+            
+            // 1. Update the filter dropdown
+            const filterDropdown = document.getElementById('sc-filter');
+            if (filterDropdown) {
+              if (filterDropdown.value === schoolCode) {
+                filterDropdown.value = 'all';
+              } else {
+                filterDropdown.value = schoolCode;
+              }
+              applyFilters();
+            }
+            
+            // 2. Scroll to the Browse All publications section
+            const targetSection = document.getElementById('sec-pubs');
+            if (targetSection) {
+              targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        },
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -138,6 +179,32 @@ function buildCharts() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        onClick: (event, elements) => {
+          if (elements && elements.length > 0) {
+            const index = elements[0].index;
+            const year = tChart.data.labels[index];
+            
+            // 1. Update the filter dropdown
+            const filterDropdown = document.getElementById('yr-filter');
+            if (filterDropdown) {
+              if (filterDropdown.value === year) {
+                filterDropdown.value = 'all';
+              } else {
+                filterDropdown.value = year;
+              }
+              applyFilters();
+            }
+            
+            // 2. Scroll to the Browse All publications section
+            const targetSection = document.getElementById('sec-pubs');
+            if (targetSection) {
+              targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        },
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        },
         plugins: { legend: { display: false } },
         scales: {
           x: { stacked: true, ticks: { font: { family: 'Inter', size: 10 }, autoSkip: false, maxRotation: 0 } },
@@ -404,11 +471,11 @@ function buildFaculty() {
         <div style="font-size:11px; font-weight:600; color:var(--text-main); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px">Publication highlights</div>
         ${list.slice(0, 4).map(p => `
           <div class="fp-pub">
-            <div class="fp-pub-title">${p.title}</div>
+            <div class="fp-pub-title"><a href="${p.url}" target="_blank" style="color:inherit; text-decoration:none; transition:var(--transition-smooth);" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='inherit'">${p.title}</a></div>
             <div class="fp-pub-meta">
               <span style="font-size:10px; color:var(--text-muted)">${p.year}</span>
               ${TYPE_B[p.type] || ''}
-              <span style="font-size:10px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px">${p.publisher}</span>
+              <a href="${p.url}" target="_blank" style="font-size:10px; color:var(--primary); text-decoration:none; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;">${p.publisher}</a>
             </div>
           </div>
         `).join('')}
@@ -482,8 +549,20 @@ function rebuildAll(logData = []) {
 function applyFilters() {
   const school = document.getElementById('sc-filter').value;
   const year = document.getElementById('yr-filter').value;
+  
+  // Show or hide clear button based on active filters
+  const clearBtn = document.getElementById('clear-table-filters');
+  if (clearBtn) {
+    if (school !== 'all' || year !== 'all') {
+      clearBtn.style.display = 'inline-flex';
+    } else {
+      clearBtn.style.display = 'none';
+    }
+  }
+
   PUBS = ALL_PUBS.filter(p => {
-    const matchSchool = (school === 'all' || p.school === school);
+    const pSchoolCode = normalizeSchoolCode(p.school);
+    const matchSchool = (school === 'all' || pSchoolCode === school);
     const matchYear = (year === 'all' || String(p.year) === year);
     return matchSchool && matchYear;
   });
@@ -835,7 +914,7 @@ function drawNetwork() {
   svg.innerHTML = '';
   
   const clusterFilter = document.getElementById('net-cluster-filter')?.value || 'all';
-  const yearFilter = document.getElementById('net-year-filter')?.value || 'all';
+  const yearFilter = document.getElementById('net-year-filter')?.value || '2023-2026';
   const densityFilter = document.getElementById('net-density-filter')?.value || 'medium';
   
   const showInternal = document.getElementById('toggle-internal')?.classList.contains('on');
@@ -1155,7 +1234,7 @@ function drawNetwork() {
     const op = e.type === 'internal' 
       ? (e.w >= 3 ? 0.7 : 0.4) 
       : 0.25;
-    const strokeColor = e.type === 'internal' ? '#003366' : '#888780';
+    const strokeColor = e.type === 'internal' ? '#02AEEE' : '#888780';
     const strokeDash = e.type === 'external' ? '3,3' : 'none';
     
     drawHtml += `<line x1="${sNode.x}" y1="${sNode.y}" x2="${tNode.x}" y2="${tNode.y}" stroke="${strokeColor}" stroke-width="${sw}" stroke-opacity="${op}" stroke-dasharray="${strokeDash}"/>`;
@@ -1173,7 +1252,7 @@ function drawNetwork() {
       : n.r + 12;
       
     drawHtml += `
-      <g class="net-node" style="cursor:pointer;" onmouseenter="showTT(event, '${n.id}', '${n.label.replace(/'/g, "\\'")}', '${n.cluster}')" onmouseleave="hideTT()">
+      <g class="net-node" style="cursor:pointer;" onclick="if('${n.type}'==='daystar'){showResearcherDetailsModal('${n.id.replace(/'/g, "\\'")}')}" onmouseenter="showTT(event, '${n.id}', '${n.label.replace(/'/g, "\\'")}', '${n.cluster}')" onmouseleave="hideTT()">
         <circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${col}" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${n.type==='daystar'?1:0.8}"/>
         ${n.type === 'daystar' && n.r > 12 ? `<text x="${n.x}" y="${n.y+4}" fill="#FFF" font-family="'Outfit', sans-serif" font-size="9px" font-weight="700" text-anchor="middle" pointer-events="none">${initials}</text>` : ''}
         <text class="node-label" x="${n.x}" y="${n.y+labelYOffset}" text-anchor="middle" fill="#2d3748" font-family="'Inter', sans-serif" font-size="9px" font-weight="600" style="text-shadow: 0 1px 2px rgba(255,255,255,0.8);">${n.label.split(',')[0]}</text>
@@ -1268,9 +1347,12 @@ function generateTeam() {
   
   const getGrants = (f) => {
     const grants = [];
-    if (f.pubCount >= 4 && ['SSEH', 'SON', 'SBE'].includes(f.school)) grants.push('NRF');
-    if (f.pubCount >= 3 && ['SOC', 'SBE', 'SASS', 'SHSS'].includes(f.school)) grants.push('IDRC');
-    if (f.pubCount >= 3 && ['SSEH', 'SON', 'SHSS'].includes(f.school)) grants.push('Wellcome');
+    // NRF Kenya is broadly available to active researchers in all academic disciplines
+    if (f.pubCount >= 4) grants.push('NRF');
+    // IDRC covers social, development, legal policy, mission/theology, and communication fields
+    if (f.pubCount >= 3 && ['SOC', 'SBE', 'SASS', 'SHSS', 'SOL', 'SMT'].includes(f.school)) grants.push('IDRC');
+    // Wellcome Trust covers health, sciences, nursing, human science, and ethics/law fields
+    if (f.pubCount >= 3 && ['SSEH', 'SON', 'SHSS', 'SOL'].includes(f.school)) grants.push('Wellcome');
     return grants;
   };
   
@@ -1416,9 +1498,9 @@ function generateTeam() {
     </div>
     
     <div class="export-row">
-      <button class="btn-outline" onclick="generateTeam()">↺ Regenerate</button>
-      <button class="btn-outline" onclick="alert('Suggested team configuration saved locally to your session.')">Save team</button>
-      <button class="btn-primary-sm" onclick="openContactModal('DRICE Research Office', 'drice@daystar.ac.ke', 'Multi-disciplinary Consortium')">Email team suggestion to DRICE &rarr;</button>
+      <button class="btn-outline" onclick="regenerateTeamWithUI()">↺ Regenerate</button>
+      <button class="btn-outline" onclick="saveSuggestedTeam()">Save team</button>
+      <button class="btn-primary-sm" onclick="emailTeamSuggestionToDRICE()">Email team suggestion to DRICE &rarr;</button>
     </div>
   `;
   
@@ -1453,3 +1535,279 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+/* ── ADDITIONAL DU-SPACE PREMIUM UTILITIES ── */
+
+function clearAllFilters() {
+  const scFilter = document.getElementById('sc-filter');
+  const yrFilter = document.getElementById('yr-filter');
+  if (scFilter) scFilter.value = 'all';
+  if (yrFilter) yrFilter.value = 'all';
+  applyFilters();
+}
+
+function exportChartImage(chart, filename) {
+  if (!chart) {
+    alert("Chart instance not loaded.");
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = chart.toBase64Image();
+  link.download = filename || 'chart.png';
+  link.click();
+  showToastNotification(`Successfully exported chart as ${filename || 'chart.png'}`);
+}
+
+function exportNetworkSVG() {
+  const svgEl = document.getElementById('networkSVG');
+  if (!svgEl) {
+    alert("Network SVG element not found.");
+    return;
+  }
+  
+  // 1. Serialize SVG XML string
+  const serializer = new XMLSerializer();
+  let source = serializer.serializeToString(svgEl);
+  
+  // Add XML declaration if not present
+  if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  if (!source.match(/^<svg[^>]+xmlns\:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+  }
+  
+  // Add custom styling rules inside SVG so fonts render correctly
+  const styleString = `
+    <style type="text/css">
+      .node-label { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600; }
+      text { font-family: sans-serif; }
+    </style>
+  `;
+  source = source.replace(/>/, `>${styleString}`);
+  
+  // 2. Trigger download
+  const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const svgUrl = URL.createObjectURL(svgBlob);
+  const downloadLink = document.createElement('a');
+  downloadLink.href = svgUrl;
+  downloadLink.download = 'coauthorship_collaboration_network.svg';
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+  
+  showToastNotification("Successfully exported collaboration map as SVG!");
+}
+
+function showResearcherDetailsModal(id) {
+  // 1. Gather researcher details
+  const myPubs = ALL_PUBS.filter(p => (p.authors || '').includes(id));
+  if (!myPubs.length) {
+    alert("No publications data found for " + id);
+    return;
+  }
+  
+  const schoolCounts = {};
+  myPubs.forEach(p => {
+    if (p.school) schoolCounts[p.school] = (schoolCounts[p.school] || 0) + 1;
+  });
+  let school = 'Other';
+  let maxSc = 0;
+  Object.entries(schoolCounts).forEach(([sc, count]) => {
+    if (count > maxSc) {
+      maxSc = count;
+      school = sc;
+    }
+  });
+  
+  const fProfile = FACULTY_LIST.find(f => f.name === id);
+  const slug = fProfile ? fProfile.slug : slugify(id);
+  const lastActive = fProfile ? fProfile.lastActive : Math.max(...myPubs.map(p => p.year || 2026));
+  const activeYears = fProfile ? fProfile.activeYears : (myPubs.length ? `${Math.min(...myPubs.map(p => p.year || 2026))}–${lastActive}` : 'Unknown');
+  const sdgs = [...new Set(myPubs.flatMap(p => p.sdgs ? p.sdgs.split('|').map(s => s.trim()).filter(Boolean) : []))];
+  const verifiedCount = myPubs.filter(p => p.indexing && p.indexing !== 'Verify').length;
+  
+  // School colors mapping
+  const schoolColors = {
+    SSEH: '#25AAE1', SOC: '#1D9E75', SBE: '#EF9F27', SHSS: '#E0606F',
+    SON: '#7C3AED', SOL: '#BA7517', SASS: '#64748B', SMT: '#639922'
+  };
+  const col = schoolColors[school] || '#888780';
+  const initials = id.split(' ').map(w => w[0] || '').join('').substring(0, 2).toUpperCase();
+  
+  // Highlight list
+  const pubHighlightsHtml = myPubs.slice(0, 4).map(p => `
+    <div style="padding: 10px 14px; background: var(--bg-app); border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 8px; text-align:left;">
+      <a href="${p.url}" target="_blank" style="font-family:'Outfit', sans-serif; font-size:13px; font-weight:600; color:var(--primary); text-decoration:none; display:block; margin-bottom:4px; line-height:1.4;">${p.title}</a>
+      <div style="font-size:10.5px; color:var(--text-muted); display:flex; gap:8px; align-items:center;">
+        <span class="badge bgr" style="font-size:9px; padding:1px 5px;">${p.year}</span>
+        <span style="background:${p.type==='Journal Article'?'#E6F1FB':p.type==='Conference Paper'?'#EEEDFE':'#FAECE7'}; color:${p.type==='Journal Article'?'#0C447C':p.type==='Conference Paper'?'#3C3489':'#993C1D'}; border:1px solid rgba(0,0,0,0.03); font-size:9px; padding:1px 5px;" class="badge">${p.type}</span>
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px;">${p.publisher}</span>
+      </div>
+    </div>
+  `).join('');
+  
+  const sdgBadges = sdgs.slice(0, 6).map(s => `<span class="badge b-sdg" style="background:#E1F5EE; color:#085041; margin-right:4px; margin-bottom:4px;">${s}</span>`).join('');
+  
+  // Create details modal markup
+  let modal = document.getElementById('researcher-details-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'researcher-details-modal';
+    modal.style.cssText = 'display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,23,42,0.65); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:700; padding:24px; align-items:center; justify-content:center';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div style="background:#FFFFFF; border-radius:18px; width:100%; max-width:680px; overflow:hidden; border:1px solid var(--border-color); box-shadow:var(--shadow-lg); animation:modalReveal 0.3s ease-out">
+      <header class="modal-hdr" style="background:${col}; color:#FFFFFF; border-bottom:none; padding:18px 24px; display:flex; align-items:center;">
+        <div style="display:flex; align-items:center; gap:14px; width:100%;">
+          <div style="width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-family:'Outfit', sans-serif; font-size:16px; font-weight:800; color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.85); flex-shrink:0;">${initials}</div>
+          <div style="text-align:left;">
+            <h3 style="font-size:18px; font-weight:700; color:#FFFFFF; margin:0; font-family:'Outfit',sans-serif;">${id}</h3>
+            <div style="font-size:12px; color:rgba(255,255,255,0.85); margin-top:2px;">Faculty &bull; School of ${school} &bull; Active ${activeYears}</div>
+          </div>
+          <button class="modal-close" onclick="document.getElementById('researcher-details-modal').style.display='none'" style="margin-left:auto; color:#FFFFFF; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer;">✕</button>
+        </div>
+      </header>
+      
+      <div class="modal-body" style="padding:24px;">
+        <!-- Metrics Cards Row -->
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:20px;">
+          <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; text-align:center;">
+            <div style="font-family:'Outfit', sans-serif; font-size:22px; font-weight:700; color:var(--neutral-dark);">${myPubs.length}</div>
+            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:600; margin-top:2px;">Publications</div>
+          </div>
+          <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; text-align:center;">
+            <div style="font-family:'Outfit', sans-serif; font-size:22px; font-weight:700; color:var(--neutral-dark);">${myPubs.filter(p => p.type === 'Journal Article').length}</div>
+            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:600; margin-top:2px;">Journals</div>
+          </div>
+          <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; text-align:center;">
+            <div style="font-family:'Outfit', sans-serif; font-size:22px; font-weight:700; color:var(--neutral-dark);">${verifiedCount}</div>
+            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:600; margin-top:2px;">Indexed (Scopus)</div>
+          </div>
+          <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; text-align:center;">
+            <div style="font-family:'Outfit', sans-serif; font-size:22px; font-weight:700; color:var(--neutral-dark);">${lastActive}</div>
+            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:600; margin-top:2px;">Last Active</div>
+          </div>
+        </div>
+        
+        <!-- SDGs Covered -->
+        ${sdgBadges ? `
+        <div style="margin-bottom:20px; text-align:left;">
+          <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Target SDGs Cover</div>
+          <div style="display:flex; flex-wrap:wrap;">${sdgBadges}</div>
+        </div>` : ''}
+        
+        <!-- Publication Highlights Section -->
+        <div style="margin-bottom:20px; text-align:left;">
+          <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Publication Highlights</div>
+          <div style="max-height:180px; overflow-y:auto; padding-right:4px;">
+            ${pubHighlightsHtml}
+          </div>
+        </div>
+        
+        <!-- Footer Navigation Options -->
+        <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:10px;">
+          <a href="/faculty/${slug}" target="_blank" class="btn-import btn-secondary-theme" style="color:var(--neutral-dark); border-color:var(--border-color); text-decoration:none; padding:8px 16px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">View Full Profile &nearr;</a>
+          <button class="btn-import btn-primary-theme" onclick="document.getElementById('researcher-details-modal').style.display='none'; openContactModal('${id.replace(/'/g, "\\'")}', 'faculty.${slug}@daystar.ac.ke', 'School of ${school} collaborative research');" style="padding:8px 16px; font-size:12px; background:${col}; border-color:${col};">Contact Researcher &rarr;</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Close modal when clicking on background overlay
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  };
+  
+  modal.style.display = 'flex';
+}
+
+function regenerateTeamWithUI() {
+  const container = document.getElementById('team-results-container');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 24px; gap:16px; width:100%;">
+      <div style="width:36px; height:36px; border:3.5px solid var(--border-color); border-top-color:var(--primary); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+      <span style="font-size:12px; color:var(--text-muted); font-weight:600; letter-spacing:0.5px;">Re-evaluating researcher profiles...</span>
+    </div>
+  `;
+  
+  setTimeout(() => {
+    generateTeam();
+  }, 550);
+}
+
+function saveSuggestedTeam() {
+  const selectedClusters = Array.from(document.querySelectorAll('#tb-cluster-picker .cluster-option.selected'))
+    .map(el => el.getAttribute('data-cluster'));
+  const selectedSDGs = Array.from(document.querySelectorAll('#tb-sdg-picker .sdg-btn.on'))
+    .map(el => el.getAttribute('data-sdg'));
+    
+  const savedConsortium = {
+    timestamp: new Date().toLocaleString(),
+    schools: selectedClusters,
+    sdgs: selectedSDGs,
+    memberCount: document.querySelectorAll('.team-card').length
+  };
+  
+  localStorage.setItem('saved_consortium_team', JSON.stringify(savedConsortium));
+  showToastNotification('Consortium team configuration successfully saved to your session!');
+}
+
+function emailTeamSuggestionToDRICE() {
+  const cards = document.querySelectorAll('.team-card');
+  if (!cards.length) {
+    alert("No team suggestions are currently available. Please configure the team first.");
+    return;
+  }
+  
+  const members = [];
+  cards.forEach(card => {
+    const name = card.querySelector('.tc-name')?.textContent || '';
+    const sub = card.querySelector('.tc-sub')?.textContent || '';
+    members.push(`- ${name} (${sub})`);
+  });
+  
+  const selectedSDGs = Array.from(document.querySelectorAll('#tb-sdg-picker .sdg-btn.on'))
+    .map(el => el.getAttribute('data-sdg')).join(', ');
+    
+  const subject = encodeURIComponent('Suggested Research Consortium Proposal - DU-Space');
+  const body = encodeURIComponent(`Dear DRICE Research Office,
+
+Based on the DU-Space Grant Consortium builder, I would like to propose the following multidisciplinary research team suggestion for our next collaborative grant application:
+
+${members.join('\n')}
+
+Shared SDG alignment: ${selectedSDGs || 'General'}
+Consortium size: ${members.length} active researchers
+
+I would welcome a brief discussion on pursuing this opportunity.
+
+Kind regards,
+[Your name]
+DU-Space Grant Builder`);
+
+  window.location.href = `mailto:drice@daystar.ac.ke?subject=${subject}&body=${body}`;
+}
+
+function showToastNotification(message) {
+  let toast = document.getElementById('app-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#0F172A; color:#FFFFFF; padding:12px 24px; border-radius:var(--radius-md); font-family:var(--font); font-size:12px; font-weight:600; display:flex; align-items:center; gap:8px; box-shadow:var(--shadow-lg); z-index:9999; transform:translateY(100px); opacity:0; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border:1px solid rgba(255,255,255,0.08);';
+    document.body.appendChild(toast);
+  }
+  
+  toast.innerHTML = `<span>✓</span> <span>${message}</span>`;
+  toast.style.transform = 'translateY(0)';
+  toast.style.opacity = '1';
+  
+  setTimeout(() => {
+    toast.style.transform = 'translateY(100px)';
+    toast.style.opacity = '0';
+  }, 3000);
+}
