@@ -14,11 +14,7 @@ let dbInstance = null;
 function getDB() {
   if (!dbInstance) {
     console.log(`[DB] Opening persistent connection to SQLite database at: ${DB_PATH}`);
-    
-    // In Vercel, open the database as read-only to avoid crash on read-only lambda filesystem
-    const mode = process.env.VERCEL ? sqlite3.OPEN_READONLY : (sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE);
-    
-    dbInstance = new sqlite3.Database(DB_PATH, mode, (err) => {
+    dbInstance = new sqlite3.Database(DB_PATH, (err) => {
       if (err) {
         console.error('[DB] Connection failed:', err.message);
         throw err;
@@ -27,13 +23,9 @@ function getDB() {
 
     // Performance Tuning for high-concurrency Node/Express environment
     dbInstance.configure('busyTimeout', 10000); // Wait up to 10s if DB is locked
-    
-    // Bypassing write-based PRAGMAs in read-only Vercel environment
-    if (!process.env.VERCEL) {
-      dbInstance.run('PRAGMA journal_mode = WAL;'); // Write-Ahead Logging for concurrent read/write
-      dbInstance.run('PRAGMA synchronous = NORMAL;'); // Speed up writes safely under normal operation
-      dbInstance.run('PRAGMA temp_store = MEMORY;'); // Store temporary tables in memory
-    }
+    dbInstance.run('PRAGMA journal_mode = WAL;'); // Write-Ahead Logging for concurrent read/write
+    dbInstance.run('PRAGMA synchronous = NORMAL;'); // Speed up writes safely under normal operation
+    dbInstance.run('PRAGMA temp_store = MEMORY;'); // Store temporary tables in memory
   }
   return dbInstance;
 }
@@ -79,13 +71,6 @@ function dbAll(sql, params = []) {
  */
 async function initDB() {
   console.log('[DB] Running initialization routines...');
-
-  if (process.env.VERCEL) {
-    console.log('[DB] Vercel environment detected. Skipping table creations, indexes, and pruning as database is read-only.');
-    // Just verify connection by getting DB
-    getDB();
-    return;
-  }
 
   // Table: publications
   await dbRun(`CREATE TABLE IF NOT EXISTS publications (
