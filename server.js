@@ -41,4 +41,14 @@ async function startServer() {
   }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+} else {
+  // Safe db read-only connection check on Vercel
+  initDB().catch((err) => {
+    console.error('[Vercel] Database connection check failed:', err);
+  });
+}
+
+// Export app for serverless function bindings in Vercel
+module.exports = app;

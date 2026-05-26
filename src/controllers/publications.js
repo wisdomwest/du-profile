@@ -151,6 +151,9 @@ async function exportCSV(req, res) {
  * POST /api/upload-csv
  */
 async function uploadCSV(req, res) {
+  if (process.env.VERCEL) {
+    return res.status(403).json({ error: 'CSV file uploads are disabled in the Vercel production environment because the serverless lambda filesystem is read-only. Please use a local environment or persistent disk hosting (e.g. Render) to import new records.' });
+  }
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   
   const rows = [];
@@ -175,6 +178,9 @@ async function uploadCSV(req, res) {
  * POST /api/harvest
  */
 async function harvest(req, res) {
+  if (process.env.VERCEL) {
+    return res.status(403).json({ error: 'DSpace live harvesting is disabled in the Vercel production environment because the serverless lambda filesystem is read-only. Please use a local environment or persistent disk hosting (e.g. Render) to execute live harvests.' });
+  }
   const { schoolCode } = req.body || {};
   const isAll = !schoolCode || schoolCode === 'all';
   const school = !isAll
@@ -283,6 +289,9 @@ async function aiInsight(req, res) {
  * POST /api/reanalyze-sdgs
  */
 async function reanalyzeSDGs(req, res) {
+  if (process.env.VERCEL) {
+    return res.status(403).json({ error: 'AI SDG re-analysis write operations are disabled in the Vercel production environment because the serverless lambda filesystem is read-only. Please use a local environment or persistent disk hosting (e.g. Render) to re-analyze records.' });
+  }
   try {
     const updatedCount = await performSDGReanalysis();
     res.json({ message: `Successfully re-analyzed ${updatedCount} publications with AI`, count: updatedCount });
